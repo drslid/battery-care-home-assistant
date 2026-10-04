@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Run the backend tests against the latest Home Assistant (or the minimum with --min), then the frontend tests.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+venv=.venv
+if [[ "${1:-}" == "--min" ]]; then
+  venv=.venv-min
+  shift
+fi
+
+"$venv/bin/pytest" --cov --cov-report=term-missing --cov-fail-under=90 "$@"
+npm run --prefix frontend test

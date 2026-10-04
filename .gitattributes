@@ -1,0 +1,3 @@
+* text=auto eol=lf
+*.png binary
+custom_components/battery_care/frontend/battery-care-panel.js linguist-generated=true

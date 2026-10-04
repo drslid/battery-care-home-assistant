@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Create the Python environments (latest and minimum Home Assistant) and install the frontend tools.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+uv venv --allow-existing --python 3.14 .venv
+uv pip install --python .venv -r requirements_test.txt -r requirements_lint.txt
+
+uv venv --allow-existing --python 3.14 .venv-min
+uv pip install --python .venv-min -r requirements_test_min.txt
+
+npm ci --prefix frontend

@@ -1,0 +1,2 @@
+# Test harness for Home Assistant 2026.8.0, the minimum version declared in hacs.json.
+pytest-homeassistant-custom-component==0.13.354

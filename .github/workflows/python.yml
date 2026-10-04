@@ -1,0 +1,62 @@
+name: Python
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.14"
+          activate-environment: true
+      - run: uv pip install -r requirements_test.txt -r requirements_lint.txt
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy
+
+  test:
+    if: github.event_name != 'schedule'
+    name: test (Home Assistant ${{ matrix.ha }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ha: 2026.9.4
+            requirements: requirements_test.txt
+          - ha: 2026.8.0
+            requirements: requirements_test_min.txt
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.14"
+          activate-environment: true
+      - run: uv pip install -r ${{ matrix.requirements }}
+      - run: pytest --cov --cov-report=term-missing --cov-fail-under=90
+
+  beta:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    name: test (newest harness, Home Assistant beta allowed)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: "3.14"
+          activate-environment: true
+      - run: uv pip install --prerelease=allow pytest-homeassistant-custom-component
+      - run: pytest

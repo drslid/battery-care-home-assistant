@@ -1,0 +1,2 @@
+# Test harness for Home Assistant 2026.9.4, the latest stable release.
+pytest-homeassistant-custom-component==0.13.367
