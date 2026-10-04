@@ -41,6 +41,7 @@ select = [
 ignore = [
   "D202",    # The formatter decides on blank lines after docstrings.
   "PLR0913", # Home Assistant callbacks and fixtures take many arguments.
+  "TID252",  # Relative imports are the convention inside an integration package.
   "TRY003",  # User-facing errors carry translation keys; messages stay short.
 ]
 

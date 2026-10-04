@@ -7,9 +7,14 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.battery_care.const import DOMAIN, NAME
 
+from .common import BATTERY, add_device, add_entity
+
 
 async def test_one_confirmation_creates_the_entry(hass: HomeAssistant) -> None:
-    """The flow asks for nothing but a confirmation."""
+    """The flow asks for nothing but a confirmation, then reports what it found."""
+    door = add_device(hass, "Front Door")
+    add_entity(hass, "door_battery", "78", device_id=door.id, attributes=BATTERY)
+
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
     )
@@ -23,6 +28,8 @@ async def test_one_confirmation_creates_the_entry(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == NAME
     assert result["data"] == {}
+    assert result["description"] == "devices_found"
+    assert result["description_placeholders"] == {"count": "1"}
     entries = hass.config_entries.async_entries(DOMAIN)
     assert len(entries) == 1
     assert entries[0].state is ConfigEntryState.LOADED

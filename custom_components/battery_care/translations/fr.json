@@ -8,6 +8,9 @@
     },
     "abort": {
       "single_instance_allowed": "Battery Care est déjà configuré."
+    },
+    "create_entry": {
+      "devices_found": "Appareils sur batterie trouvés : {count}. Battery Care continue de surveiller l’arrivée de nouveaux appareils."
     }
   }
 }

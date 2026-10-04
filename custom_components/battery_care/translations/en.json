@@ -8,6 +8,9 @@
     },
     "abort": {
       "single_instance_allowed": "Battery Care is already set up."
+    },
+    "create_entry": {
+      "devices_found": "Battery-powered devices found: {count}. Battery Care keeps watching for new ones."
     }
   }
 }
