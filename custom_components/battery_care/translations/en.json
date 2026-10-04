@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Battery Care?",
+        "description": "Battery Care will automatically discover the battery-powered devices connected to Home Assistant."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Battery Care is already set up."
+    }
+  }
+}
