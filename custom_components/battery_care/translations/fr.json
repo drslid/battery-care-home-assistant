@@ -12,5 +12,10 @@
     "create_entry": {
       "devices_found": "Appareils sur batterie trouvés : {count}. Battery Care continue de surveiller l’arrivée de nouveaux appareils."
     }
+  },
+  "exceptions": {
+    "storage_too_new": {
+      "message": "Les données de Battery Care ont été enregistrées par une version plus récente. Mettez Battery Care à jour, ou restaurez une sauvegarde faite avec cette version."
+    }
   }
 }

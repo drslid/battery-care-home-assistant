@@ -12,5 +12,10 @@
     "create_entry": {
       "devices_found": "Battery-powered devices found: {count}. Battery Care keeps watching for new ones."
     }
+  },
+  "exceptions": {
+    "storage_too_new": {
+      "message": "Battery Care data was saved by a newer version of Battery Care. Update Battery Care, or restore a backup made with this version."
+    }
   }
 }
