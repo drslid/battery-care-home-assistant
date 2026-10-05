@@ -807,8 +807,8 @@ var q = {
 			type: "Battery type",
 			automatic: "Automatic ({value})",
 			own_thresholds: "Own thresholds",
-			low_threshold: "Low below",
-			critical_threshold: "Critical below",
+			low_threshold: "Low at",
+			critical_threshold: "Critical at",
 			ignore: "Ignore this battery",
 			stop_ignoring: "Stop ignoring",
 			ignored_help: "Battery Care keeps showing this battery but never alerts about it."
@@ -824,8 +824,8 @@ var q = {
 				other: "{count} batteries"
 			},
 			alerts: "Alerts",
-			low: "Low below",
-			critical: "Critical below",
+			low: "Low at",
+			critical: "Critical at",
 			general_title: "Alerts and reminders",
 			alerts_enabled: "Battery Care alerts",
 			reminder_hours: "Remind every",
@@ -970,8 +970,8 @@ var q = {
 			type: "Type de batterie",
 			automatic: "Automatique ({value})",
 			own_thresholds: "Seuils propres",
-			low_threshold: "Faible sous",
-			critical_threshold: "Critique sous",
+			low_threshold: "Faible à",
+			critical_threshold: "Critique à",
 			ignore: "Ignorer cette batterie",
 			stop_ignoring: "Ne plus ignorer",
 			ignored_help: "Battery Care continue d’afficher cette batterie mais n’envoie jamais d’alerte à son sujet."
@@ -987,8 +987,8 @@ var q = {
 				other: "{count} batteries"
 			},
 			alerts: "Alertes",
-			low: "Faible sous",
-			critical: "Critique sous",
+			low: "Faible à",
+			critical: "Critique à",
 			general_title: "Alertes et rappels",
 			alerts_enabled: "Alertes Battery Care",
 			reminder_hours: "Rappeler toutes les",

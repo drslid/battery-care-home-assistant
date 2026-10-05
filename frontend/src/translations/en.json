@@ -121,8 +121,8 @@
     "type": "Battery type",
     "automatic": "Automatic ({value})",
     "own_thresholds": "Own thresholds",
-    "low_threshold": "Low below",
-    "critical_threshold": "Critical below",
+    "low_threshold": "Low at",
+    "critical_threshold": "Critical at",
     "ignore": "Ignore this battery",
     "stop_ignoring": "Stop ignoring",
     "ignored_help": "Battery Care keeps showing this battery but never alerts about it."
@@ -138,8 +138,8 @@
       "other": "{count} batteries"
     },
     "alerts": "Alerts",
-    "low": "Low below",
-    "critical": "Critical below",
+    "low": "Low at",
+    "critical": "Critical at",
     "general_title": "Alerts and reminders",
     "alerts_enabled": "Battery Care alerts",
     "reminder_hours": "Remind every",

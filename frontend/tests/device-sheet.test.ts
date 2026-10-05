@@ -382,7 +382,7 @@ describe("customizing a battery", () => {
     const { sheet, callWS } = await mountAdmin();
 
     await choose(sheet, input(sheet, "Own thresholds"), true);
-    const low = input(sheet, "Low below");
+    const low = input(sheet, "Low at");
     expect(low.value).toBe("20");
     expect([low.min, low.max]).toEqual(["1", "95"]);
     await choose(sheet, low, "30");
@@ -393,7 +393,7 @@ describe("customizing a battery", () => {
       ["custom", {}],
       ["custom", { low_threshold: 30 }],
     ]);
-    expect(input(sheet, "Low below").value).toBe("30");
+    expect(input(sheet, "Low at").value).toBe("30");
   });
 
   it("ignores a battery, then stops ignoring it", async () => {

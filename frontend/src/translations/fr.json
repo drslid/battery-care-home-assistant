@@ -121,8 +121,8 @@
     "type": "Type de batterie",
     "automatic": "Automatique ({value})",
     "own_thresholds": "Seuils propres",
-    "low_threshold": "Faible sous",
-    "critical_threshold": "Critique sous",
+    "low_threshold": "Faible à",
+    "critical_threshold": "Critique à",
     "ignore": "Ignorer cette batterie",
     "stop_ignoring": "Ne plus ignorer",
     "ignored_help": "Battery Care continue d’afficher cette batterie mais n’envoie jamais d’alerte à son sujet."
@@ -138,8 +138,8 @@
       "other": "{count} batteries"
     },
     "alerts": "Alertes",
-    "low": "Faible sous",
-    "critical": "Critique sous",
+    "low": "Faible à",
+    "critical": "Critique à",
     "general_title": "Alertes et rappels",
     "alerts_enabled": "Alertes Battery Care",
     "reminder_hours": "Rappeler toutes les",
