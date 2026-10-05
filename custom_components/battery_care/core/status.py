@@ -69,7 +69,11 @@ def needs_attention(status: Status, settings: Settings) -> bool:
 
 @dataclass(frozen=True, slots=True)
 class Summary:
-    """Counts of battery devices; only devices with alerts on are monitored."""
+    """Counts of battery devices; only devices with alerts on are monitored.
+
+    A monitored device without any reading yet is neither healthy nor a
+    problem: it counts as unknown.
+    """
 
     total: int = 0
     monitored: int = 0
@@ -78,11 +82,12 @@ class Summary:
     critical: int = 0
     low: int = 0
     not_responding: int = 0
+    unknown: int = 0
 
 
 def summarize(devices: Iterable[tuple[Status, bool]]) -> Summary:
     """Count devices, each given as its status and whether its alerts are on."""
-    total = monitored = 0
+    total = monitored = unknown = 0
     attention = dict.fromkeys(ATTENTION, 0)
     for status, alerts_enabled in devices:
         total += 1
@@ -91,13 +96,16 @@ def summarize(devices: Iterable[tuple[Status, bool]]) -> Summary:
         monitored += 1
         if status in attention:
             attention[status] += 1
+        elif status is Status.UNKNOWN:
+            unknown += 1
     needing = sum(attention.values())
     return Summary(
         total=total,
         monitored=monitored,
-        healthy=monitored - needing,
+        healthy=monitored - needing - unknown,
         attention=needing,
         critical=attention[Status.CRITICAL],
         low=attention[Status.LOW],
         not_responding=attention[Status.NOT_RESPONDING],
+        unknown=unknown,
     )

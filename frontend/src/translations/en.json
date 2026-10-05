@@ -21,6 +21,7 @@
       "other": "{count} batteries need attention"
     },
     "healthy_title": "All batteries are healthy",
+    "no_attention_title": "No battery needs attention",
     "no_alerts_title": "Alerts are off for every battery",
     "needs_attention": "Needs attention",
     "see_all": {
@@ -34,7 +35,8 @@
     "healthy": "Healthy",
     "low": "Low",
     "critical": "Critical",
-    "not_responding": "Not responding"
+    "not_responding": "Not responding",
+    "unknown": "No data yet"
   },
   "all": {
     "title": {

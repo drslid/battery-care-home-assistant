@@ -34,17 +34,25 @@ function byLevel(a: DeviceView, b: DeviceView): number {
   return levelA === levelB ? byName(a, b) : levelA - levelB;
 }
 
+function bySeverity(a: DeviceView, b: DeviceView): number {
+  return (SEVERITY[a.status] ?? 3) - (SEVERITY[b.status] ?? 3);
+}
+
 /** Most severe first, then the most important, then the lowest level. */
 export function byAttention(a: DeviceView, b: DeviceView): number {
   return (
-    (SEVERITY[a.status] ?? 3) - (SEVERITY[b.status] ?? 3) ||
+    bySeverity(a, b) ||
     IMPORTANCE[a.importance] - IMPORTANCE[b.importance] ||
     byLevel(a, b)
   );
 }
 
+/**
+ * Problems first, most severe first, then from the lowest level: a battery
+ * that only reports "low" has no level, but must not end up last.
+ */
 export function sortByLevel(devices: Iterable<DeviceView>): DeviceView[] {
-  return [...devices].sort(byLevel);
+  return [...devices].sort((a, b) => bySeverity(a, b) || byLevel(a, b));
 }
 
 function deviceRow(device: DeviceView, context: ViewContext): TemplateResult {
@@ -105,11 +113,15 @@ function summaryTitle(summary: Summary, language: Language): string {
       count: summary.attention,
     });
   }
+  if (summary.monitored === 0) {
+    return localize(language, "overview.no_alerts_title");
+  }
+  // Batteries without data yet are not known to be healthy.
   return localize(
     language,
-    summary.monitored > 0
-      ? "overview.healthy_title"
-      : "overview.no_alerts_title",
+    summary.unknown > 0
+      ? "overview.no_attention_title"
+      : "overview.healthy_title",
   );
 }
 
@@ -161,6 +173,11 @@ export function renderOverview(
           localize(language, "counts.not_responding"),
           "warning",
         )}
+        ${
+          summary.unknown > 0
+            ? count(summary.unknown, localize(language, "counts.unknown"), null)
+            : nothing
+        }
       </dl>
     </section>
     ${

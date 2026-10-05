@@ -374,7 +374,8 @@ export class BatteryCarePanel extends LitElement {
         cursor: pointer;
       }
       .summary h2 {
-        padding-bottom: 12px;
+        margin: 0;
+        padding: 16px 16px 12px;
         font-size: 20px;
         font-weight: 400;
       }
@@ -386,9 +387,18 @@ export class BatteryCarePanel extends LitElement {
         border-top: 1px solid var(--bc-divider);
         background: var(--bc-divider);
       }
+      /* An odd count out spans the row instead of leaving a gap. */
+      .count:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+      }
       @container (min-width: 600px) {
         .counts {
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: none;
+          grid-auto-columns: minmax(0, 1fr);
+          grid-auto-flow: column;
+        }
+        .count:last-child:nth-child(odd) {
+          grid-column: auto;
         }
       }
       .count {
@@ -443,13 +453,17 @@ export class BatteryCarePanel extends LitElement {
         flex-direction: column;
         gap: 2px;
       }
-      .row-name,
+      .row-name {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+        overflow-wrap: break-word;
+      }
       .row-details {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-      }
-      .row-details {
         font-size: 14px;
       }
       .row-value {
@@ -457,6 +471,7 @@ export class BatteryCarePanel extends LitElement {
         flex-direction: column;
         align-items: flex-end;
         gap: 2px;
+        max-width: 40%;
         text-align: end;
       }
       .row-level {

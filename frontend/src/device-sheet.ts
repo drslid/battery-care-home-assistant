@@ -1,4 +1,4 @@
-import { mdiClose } from "@mdi/js";
+import { mdiChevronDown, mdiClose } from "@mdi/js";
 import {
   LitElement,
   css,
@@ -257,7 +257,10 @@ export class BatteryCareDeviceSheet extends LitElement {
             </p>`
       }
       <details class="sources">
-        <summary>${localize(language, "sheet.entities")}</summary>
+        <summary>
+          <span>${localize(language, "sheet.entities")}</span>
+          ${icon(mdiChevronDown)}
+        </summary>
         <ul>
           ${details.sources.map(
             (source) =>
@@ -383,8 +386,20 @@ export class BatteryCareDeviceSheet extends LitElement {
         min-height: 48px;
         display: flex;
         align-items: center;
+        justify-content: space-between;
+        gap: 8px;
         cursor: pointer;
         font-weight: 500;
+        list-style: none;
+      }
+      .sources summary::-webkit-details-marker {
+        display: none;
+      }
+      .sources summary .icon {
+        transition: transform 0.2s;
+      }
+      .sources[open] summary .icon {
+        transform: rotate(180deg);
       }
       .sources ul {
         margin: 0;

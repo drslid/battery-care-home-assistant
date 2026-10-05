@@ -104,7 +104,7 @@ def test_attention_needs_alerts_on() -> None:
 
 
 def test_the_summary_counts_only_monitored_problems() -> None:
-    """Devices with alerts off count in the total only."""
+    """Devices with alerts off count in the total only; no reading is not healthy."""
     summary = summarize(
         [
             (Status.CRITICAL, True),
@@ -122,11 +122,12 @@ def test_the_summary_counts_only_monitored_problems() -> None:
     assert summary == Summary(
         total=9,
         monitored=7,
-        healthy=3,
+        healthy=2,
         attention=4,
         critical=1,
         low=2,
         not_responding=1,
+        unknown=1,
     )
 
 

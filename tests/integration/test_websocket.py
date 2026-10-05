@@ -100,6 +100,7 @@ async def test_a_panel_gets_every_battery_and_a_summary(
         "critical": 1,
         "low": 0,
         "not_responding": 0,
+        "unknown": 0,
     }
     assert by_key(message["devices"]) == {
         f"d:{door.id}": {

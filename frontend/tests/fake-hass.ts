@@ -88,6 +88,7 @@ export const SUMMARY: Summary = {
   critical: 1,
   low: 1,
   not_responding: 0,
+  unknown: 0,
 };
 
 export function device(overrides: Partial<DeviceView> = {}): DeviceView {

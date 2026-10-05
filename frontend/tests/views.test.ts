@@ -5,6 +5,7 @@ import {
   renderAll,
   renderOverview,
   renderSkeleton,
+  sortByLevel,
   type ViewContext,
 } from "../src/views";
 import { DEVICES, SUMMARY, device } from "./fake-hass";
@@ -121,6 +122,29 @@ describe("overview", () => {
     ]);
   });
 
+  it("does not call batteries without data healthy", () => {
+    const waiting = {
+      ...SUMMARY,
+      healthy: 2,
+      attention: 0,
+      critical: 0,
+      low: 0,
+      unknown: 1,
+    };
+    const container = mount(renderOverview([], waiting, "/all", CONTEXT));
+
+    expect(texts(container, ".summary h2")).toEqual([
+      "No battery needs attention",
+    ]);
+    expect(texts(container, ".count")).toEqual([
+      "Healthy 2",
+      "Low 0",
+      "Critical 0",
+      "Not responding 0",
+      "No data yet 1",
+    ]);
+  });
+
   it("explains an empty home", () => {
     const empty = {
       total: 0,
@@ -130,6 +154,7 @@ describe("overview", () => {
       critical: 0,
       low: 0,
       not_responding: 0,
+      unknown: 0,
     };
     const container = mount(renderOverview([], empty, "/all", CONTEXT));
 
@@ -153,6 +178,36 @@ describe("all batteries", () => {
       "Window",
     ]);
     expect(texts(container, ".row-level")).toEqual(["8%", "18%", "64%"]);
+  });
+
+  it("puts problems first, even those without a level", () => {
+    const devices = [
+      device({ key: "ok", name: "Remote", level: 64, status: "ok" }),
+      device({
+        key: "unknown",
+        name: "Basement",
+        level: null,
+        status: "unknown",
+      }),
+      device({ key: "low-flag", name: "Smoke", level: null, status: "low" }),
+      device({
+        key: "silent",
+        name: "Attic",
+        level: null,
+        status: "not_responding",
+      }),
+      device({ key: "low", name: "Garage", level: 17, status: "low" }),
+      device({ key: "critical", name: "Door", level: 6, status: "critical" }),
+    ];
+
+    expect(sortByLevel(devices).map((item) => item.key)).toEqual([
+      "critical",
+      "silent",
+      "low",
+      "low-flag",
+      "ok",
+      "unknown",
+    ]);
   });
 });
 

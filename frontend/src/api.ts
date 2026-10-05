@@ -43,6 +43,7 @@ export interface Summary {
   critical: number;
   low: number;
   not_responding: number;
+  unknown: number;
 }
 
 export interface Snapshot {

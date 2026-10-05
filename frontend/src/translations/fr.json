@@ -21,6 +21,7 @@
       "other": "{count} batteries demandent votre attention"
     },
     "healthy_title": "Toutes les batteries sont en bon état",
+    "no_attention_title": "Aucune batterie ne demande votre attention",
     "no_alerts_title": "Les alertes sont désactivées pour toutes les batteries",
     "needs_attention": "À traiter",
     "see_all": {
@@ -34,7 +35,8 @@
     "healthy": "Bon état",
     "low": "Faible",
     "critical": "Critique",
-    "not_responding": "Sans réponse"
+    "not_responding": "Sans réponse",
+    "unknown": "Pas encore de données"
   },
   "all": {
     "title": {
