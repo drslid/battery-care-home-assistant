@@ -1,6 +1,111 @@
 {
   "panel": {
     "title": "Battery Care",
-    "starting": "Démarrage…"
+    "menu": "Menu",
+    "views": "Vues"
+  },
+  "nav": {
+    "overview": "Vue d’ensemble",
+    "all": "Toutes les batteries"
+  },
+  "feed": {
+    "loading": "Chargement des batteries…",
+    "waiting": "En attente de la fin du démarrage de Home Assistant…",
+    "unavailable": "Battery Care ne fonctionne pas pour le moment. Cette page continue d’essayer de se reconnecter.",
+    "outdated": "Battery Care a été mis à jour. Rechargez cette page pour utiliser la nouvelle version.",
+    "reload": "Recharger"
+  },
+  "overview": {
+    "attention_title": {
+      "one": "{count} batterie demande votre attention",
+      "other": "{count} batteries demandent votre attention"
+    },
+    "healthy_title": "Toutes les batteries sont en bon état",
+    "no_alerts_title": "Les alertes sont désactivées pour toutes les batteries",
+    "needs_attention": "À traiter",
+    "see_all": {
+      "one": "Voir la batterie",
+      "other": "Voir les {count} batteries"
+    },
+    "empty_title": "Aucune batterie trouvée pour l’instant",
+    "empty_text": "Battery Care trouve automatiquement les appareils sur batterie, y compris les nouveaux."
+  },
+  "counts": {
+    "healthy": "Bon état",
+    "low": "Faible",
+    "critical": "Critique",
+    "not_responding": "Sans réponse"
+  },
+  "all": {
+    "title": {
+      "one": "{count} batterie",
+      "other": "{count} batteries"
+    }
+  },
+  "status": {
+    "critical": "Batterie critique",
+    "low": "Batterie faible",
+    "not_responding": "Ne répond pas",
+    "charging": "En charge",
+    "ok": "OK",
+    "unknown": "Pas encore de données",
+    "ignored": "Alertes désactivées"
+  },
+  "sheet": {
+    "close": "Fermer",
+    "missing": "Cette batterie n’est plus dans Home Assistant.",
+    "load_failed": "Impossible de charger les détails.",
+    "battery": "Batterie",
+    "battery_unknown": "Non renseignée",
+    "last_report": "Dernier relevé",
+    "never": "Jamais",
+    "category": "Catégorie",
+    "importance": "Importance",
+    "alerts": "Alertes",
+    "entities": "Entités utilisées",
+    "unstable": "Cette batterie n’a pas d’identifiant unique dans Home Assistant. Si son entité est renommée, Battery Care verra une nouvelle batterie."
+  },
+  "class": {
+    "replaceable": "Remplaçable",
+    "rechargeable": "Rechargeable",
+    "not_maintained": "Sans entretien",
+    "unknown": "Inconnue"
+  },
+  "class_reason": {
+    "energy_storage": "stocke de l’énergie",
+    "integration": "déduite de son intégration",
+    "charging_sensor": "signale sa charge",
+    "robot": "robot",
+    "mobile_app": "téléphone ou tablette",
+    "battery_type": "déduite de son type de pile",
+    "default": "non détectée",
+    "user": "choisie par vous"
+  },
+  "importance": {
+    "low": "Faible",
+    "normal": "Normale",
+    "important": "Importante",
+    "critical": "Critique"
+  },
+  "importance_source": {
+    "suggested": "suggérée",
+    "user": "choisie par vous"
+  },
+  "alerts": {
+    "automatic": "Automatiques · faible à {low}, critique à {critical}",
+    "custom": "Personnalisées · faible à {low}, critique à {critical}",
+    "off": "Désactivées",
+    "ignored": "Désactivées · cette batterie est ignorée"
+  },
+  "source": {
+    "level": "Niveau",
+    "low": "Batterie faible",
+    "charging": "Charge",
+    "low_on": "Faible",
+    "low_off": "Normale",
+    "charging_on": "En charge",
+    "charging_off": "Pas en charge",
+    "unavailable": "Indisponible",
+    "unknown": "Inconnu"
   }
 }

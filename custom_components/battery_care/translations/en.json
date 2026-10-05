@@ -10,10 +10,13 @@
       "single_instance_allowed": "Battery Care is already set up."
     },
     "create_entry": {
-      "devices_found": "Battery-powered devices found: {count}. Battery Care keeps watching for new ones."
+      "devices_found": "Battery-powered devices found: {count}. Battery Care keeps watching for new ones.\n\n[Open Battery Care]({panel_url})"
     }
   },
   "exceptions": {
+    "panel_taken": {
+      "message": "Another dashboard or panel already uses {path}. Change its address, then reload Battery Care."
+    },
     "storage_too_new": {
       "message": "Battery Care data was saved by a newer version of Battery Care. Update Battery Care, or restore a backup made with this version."
     }

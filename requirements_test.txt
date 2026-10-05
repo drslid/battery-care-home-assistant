@@ -1,2 +1,4 @@
 # Test harness for Home Assistant 2026.9.4, the latest stable release.
 pytest-homeassistant-custom-component==0.13.367
+# The panel depends on the frontend integration; this is the version 2026.9.4 pins.
+home-assistant-frontend==20260826.7

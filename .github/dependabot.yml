@@ -10,8 +10,9 @@ updates:
     schedule:
       interval: weekly
     ignore:
-      # Each harness release pins one Home Assistant version; bump it deliberately.
+      # Both are pinned to what one Home Assistant release requires; bump them together.
       - dependency-name: pytest-homeassistant-custom-component
+      - dependency-name: home-assistant-frontend
 
   - package-ecosystem: npm
     directory: /frontend

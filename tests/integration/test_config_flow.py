@@ -29,7 +29,10 @@ async def test_one_confirmation_creates_the_entry(hass: HomeAssistant) -> None:
     assert result["title"] == NAME
     assert result["data"] == {}
     assert result["description"] == "devices_found"
-    assert result["description_placeholders"] == {"count": "1"}
+    assert result["description_placeholders"] == {
+        "count": "1",
+        "panel_url": "/battery-care",
+    }
     entries = hass.config_entries.async_entries(DOMAIN)
     assert len(entries) == 1
     assert entries[0].state is ConfigEntryState.LOADED

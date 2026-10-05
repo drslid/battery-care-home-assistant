@@ -1,6 +1,111 @@
 {
   "panel": {
     "title": "Battery Care",
-    "starting": "Starting…"
+    "menu": "Menu",
+    "views": "Views"
+  },
+  "nav": {
+    "overview": "Overview",
+    "all": "All batteries"
+  },
+  "feed": {
+    "loading": "Loading batteries…",
+    "waiting": "Waiting for Home Assistant to finish starting…",
+    "unavailable": "Battery Care is not running right now. This page keeps trying to reconnect.",
+    "outdated": "Battery Care has been updated. Reload this page to use the new version.",
+    "reload": "Reload"
+  },
+  "overview": {
+    "attention_title": {
+      "one": "{count} battery needs attention",
+      "other": "{count} batteries need attention"
+    },
+    "healthy_title": "All batteries are healthy",
+    "no_alerts_title": "Alerts are off for every battery",
+    "needs_attention": "Needs attention",
+    "see_all": {
+      "one": "See the battery",
+      "other": "See all {count} batteries"
+    },
+    "empty_title": "No batteries found yet",
+    "empty_text": "Battery Care finds battery-powered devices automatically, including new ones."
+  },
+  "counts": {
+    "healthy": "Healthy",
+    "low": "Low",
+    "critical": "Critical",
+    "not_responding": "Not responding"
+  },
+  "all": {
+    "title": {
+      "one": "{count} battery",
+      "other": "{count} batteries"
+    }
+  },
+  "status": {
+    "critical": "Battery critical",
+    "low": "Battery low",
+    "not_responding": "Not responding",
+    "charging": "Charging",
+    "ok": "OK",
+    "unknown": "No data yet",
+    "ignored": "Alerts off"
+  },
+  "sheet": {
+    "close": "Close",
+    "missing": "This battery is no longer in Home Assistant.",
+    "load_failed": "The details could not be loaded.",
+    "battery": "Battery",
+    "battery_unknown": "Not set",
+    "last_report": "Last report",
+    "never": "Never",
+    "category": "Category",
+    "importance": "Importance",
+    "alerts": "Alerts",
+    "entities": "Entities used",
+    "unstable": "This battery has no unique ID in Home Assistant. If its entity is renamed, Battery Care sees a new battery."
+  },
+  "class": {
+    "replaceable": "Replaceable",
+    "rechargeable": "Rechargeable",
+    "not_maintained": "Not maintained",
+    "unknown": "Unknown"
+  },
+  "class_reason": {
+    "energy_storage": "stores energy",
+    "integration": "detected from its integration",
+    "charging_sensor": "reports charging",
+    "robot": "robot",
+    "mobile_app": "phone or tablet",
+    "battery_type": "detected from its battery type",
+    "default": "not detected",
+    "user": "chosen by you"
+  },
+  "importance": {
+    "low": "Low",
+    "normal": "Normal",
+    "important": "Important",
+    "critical": "Critical"
+  },
+  "importance_source": {
+    "suggested": "suggested",
+    "user": "chosen by you"
+  },
+  "alerts": {
+    "automatic": "Automatic · low at {low}, critical at {critical}",
+    "custom": "Custom · low at {low}, critical at {critical}",
+    "off": "Off",
+    "ignored": "Off · this battery is ignored"
+  },
+  "source": {
+    "level": "Level",
+    "low": "Low battery",
+    "charging": "Charging",
+    "low_on": "Low",
+    "low_off": "Normal",
+    "charging_on": "Charging",
+    "charging_off": "Not charging",
+    "unavailable": "Unavailable",
+    "unknown": "Unknown"
   }
 }

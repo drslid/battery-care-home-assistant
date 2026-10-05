@@ -77,6 +77,15 @@ module = "pytest_homeassistant_custom_component.*"
 follow_untyped_imports = true
 follow_imports = "silent"
 
+[[tool.mypy.overrides]]
+# These packages re-export their API by plain imports, as Home Assistant's own
+# integrations use it (websocket_api.ActiveConnection, http.StaticPathConfig).
+module = [
+  "homeassistant.components.http",
+  "homeassistant.components.websocket_api",
+]
+implicit_reexport = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

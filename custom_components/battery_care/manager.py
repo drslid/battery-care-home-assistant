@@ -1,9 +1,11 @@
 """Coordinate discovery, tracking, readings and storage for the Battery Care entry."""
 
 from collections.abc import Mapping
+from functools import partial
 import logging
-from typing import Any
+from typing import Any, Protocol
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
@@ -38,6 +40,18 @@ from .storage import (
 
 _LOGGER = logging.getLogger(__name__)
 
+type BatteryCareConfigEntry = ConfigEntry[BatteryCareManager]
+
+
+class Subscriber(Protocol):
+    """Something that follows the manager, such as an open panel."""
+
+    def async_changed(self, keys: frozenset[str] | None) -> None:
+        """Handle a change to these devices, or to anything when keys is None."""
+
+    def async_closed(self) -> None:
+        """Handle the manager stopping."""
+
 
 class BatteryCareManager:
     """Own the inventory of battery devices, their readings and the user's choices."""
@@ -45,9 +59,11 @@ class BatteryCareManager:
     def __init__(self, hass: HomeAssistant) -> None:
         """Initialize an empty manager; call async_load, then async_start."""
         self.hass = hass
+        self.ready = False
         self.inventory = Inventory(devices={})
         self.readings: dict[str, Reading] = {}
         self.config = ConfigData()
+        self._subscribers: set[Subscriber] = set()
         self._known: dict[str, KnownDevice] = {}
         self._keys_by_entity: dict[str, str] = {}
         self._tracker = InventoryTracker(
@@ -84,11 +100,20 @@ class BatteryCareManager:
 
     @callback
     def async_shutdown(self) -> None:
-        """Stop every listener."""
+        """Stop every listener, and tell subscribers."""
         if self._cancel_start is not None:
             self._cancel_start()
             self._cancel_start = None
         self._tracker.async_stop()
+        subscribers, self._subscribers = self._subscribers, set()
+        for subscriber in subscribers:
+            subscriber.async_closed()
+
+    @callback
+    def async_subscribe(self, subscriber: Subscriber) -> CALLBACK_TYPE:
+        """Follow changes until the returned callback is called."""
+        self._subscribers.add(subscriber)
+        return partial(self._subscribers.discard, subscriber)
 
     async def async_unload(self) -> None:
         """Stop, then write pending changes so a reload reads them."""
@@ -120,6 +145,7 @@ class BatteryCareManager:
         """Change global settings; raise SettingsError and change nothing if invalid."""
         self.config.settings = updated(self.config.settings, changes)
         self._async_save_config()
+        self._async_notify()
         return self.config.settings
 
     @callback
@@ -148,6 +174,7 @@ class BatteryCareManager:
         else:
             self.config.devices[key] = config
         self._async_save_config()
+        self._async_notify()
         return config
 
     @callback
@@ -164,8 +191,14 @@ class BatteryCareManager:
         return state_to_raw(self._known)
 
     @callback
+    def _async_notify(self, keys: frozenset[str] | None = None) -> None:
+        for subscriber in list(self._subscribers):
+            subscriber.async_changed(keys)
+
+    @callback
     def _async_hass_started(self, _hass: HomeAssistant) -> None:
         self._cancel_start = None
+        self.ready = True
         self._async_rebuild()
         self._tracker.async_start()
 
@@ -182,6 +215,7 @@ class BatteryCareManager:
         }
         self._tracker.async_track_sources(self._keys_by_entity)
         self._async_remember_devices()
+        self._async_notify()
         _LOGGER.debug(
             "Inventory: %d battery devices, %d suggestions, %d not monitored",
             len(self.inventory.devices),
@@ -206,9 +240,12 @@ class BatteryCareManager:
 
     @callback
     def _async_source_changed(self, entity_id: str) -> None:
-        key = self._keys_by_entity.get(entity_id)
-        if key is not None and (device := self.inventory.devices.get(key)) is not None:
-            self.readings[key] = self._read(device)
+        # Tracked entities and this index are rebuilt together.
+        key = self._keys_by_entity[entity_id]
+        reading = self._read(self.inventory.devices[key])
+        if reading != self.readings.get(key):
+            self.readings[key] = reading
+            self._async_notify(frozenset({key}))
 
     def _read(self, device: BatteryDevice) -> Reading:
         states = {

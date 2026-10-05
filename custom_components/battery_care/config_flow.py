@@ -5,7 +5,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 
 from .adapters.registry import async_inventory
-from .const import DOMAIN, NAME
+from .const import DOMAIN, NAME, PANEL_URL_PATH
 
 
 class BatteryCareConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -24,5 +24,8 @@ class BatteryCareConfigFlow(ConfigFlow, domain=DOMAIN):
             title=NAME,
             data={},
             description="devices_found",
-            description_placeholders={"count": str(found)},
+            description_placeholders={
+                "count": str(found),
+                "panel_url": f"/{PANEL_URL_PATH}",
+            },
         )
