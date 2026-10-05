@@ -6,7 +6,8 @@
   },
   "nav": {
     "overview": "Overview",
-    "all": "All batteries"
+    "all": "All batteries",
+    "settings": "Settings"
   },
   "feed": {
     "loading": "Loading batteries…",
@@ -114,5 +115,51 @@
     "charging_off": "Not charging",
     "unavailable": "Unavailable",
     "unknown": "Unknown"
+  },
+  "customize": {
+    "title": "Customize",
+    "type": "Battery type",
+    "automatic": "Automatic ({value})",
+    "own_thresholds": "Own thresholds",
+    "low_threshold": "Low below",
+    "critical_threshold": "Critical below",
+    "ignore": "Ignore this battery",
+    "stop_ignoring": "Stop ignoring",
+    "ignored_help": "Battery Care keeps showing this battery but never alerts about it."
+  },
+  "settings": {
+    "loading": "Loading settings…",
+    "load_failed": "The settings could not be loaded.",
+    "read_only": "Only an administrator can change these settings.",
+    "classes_title": "Alerts by battery type",
+    "classes_help": "Each battery follows its type. Change one battery from its sheet.",
+    "devices": {
+      "one": "{count} battery",
+      "other": "{count} batteries"
+    },
+    "alerts": "Alerts",
+    "low": "Low below",
+    "critical": "Critical below",
+    "general_title": "Alerts and reminders",
+    "alerts_enabled": "Battery Care alerts",
+    "reminder_hours": "Remind every",
+    "unavailable_alerts": "Alert when a device stops responding",
+    "unavailable_grace_hours": "Not responding after",
+    "stale_detection": "Alert when a battery stops reporting",
+    "stale_days": "Without a report for",
+    "days": "days",
+    "advanced_title": "Advanced",
+    "hysteresis": "Recovery margin",
+    "binary_recovery_minutes": "Low battery cleared after",
+    "ignored_title": "Ignored batteries",
+    "ignored_empty": "No battery is ignored. Open a battery to ignore it.",
+    "stop_ignoring": "Stop ignoring",
+    "error": {
+      "between": "Choose a value between {min} and {max}.",
+      "out_of_range": "This value is outside the allowed range.",
+      "critical_not_below_low": "The critical threshold must be below the low threshold.",
+      "recovery_above_maximum": "The low threshold plus the recovery margin must not exceed 100%.",
+      "other": "This change could not be saved."
+    }
   }
 }

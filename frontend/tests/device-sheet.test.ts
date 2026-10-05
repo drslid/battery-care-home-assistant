@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { DeviceDetails, DeviceView } from "../src/api";
+import type {
+  BatteryClass,
+  DeviceDetails,
+  DeviceMode,
+  DeviceView,
+  Importance,
+  Settings,
+} from "../src/api";
 import { BatteryCareDeviceSheet } from "../src/device-sheet";
 import type { HomeAssistant } from "../src/types";
 import { details, device, fakeHass } from "./fake-hass";
@@ -240,5 +247,192 @@ describe("device sheet", () => {
     ]);
     const codes = texts(sheet, ".sources li code");
     expect(codes[codes.length - 1]).toBe("lock.f · battery_state");
+  });
+});
+
+interface Message {
+  type: string;
+  [key: string]: unknown;
+}
+
+/** Answer device commands as the backend does, or refuse every update. */
+function backend(refusal?: string) {
+  return vi.fn((message: Message) => {
+    if (message.type !== "battery_care/device/update") {
+      return Promise.resolve(details());
+    }
+    if (refusal !== undefined) {
+      return Promise.reject(new Error(refusal));
+    }
+    return Promise.resolve(
+      details({
+        mode: message.mode as DeviceMode,
+        overrides: message.overrides as Partial<Settings>,
+        chosen_class: (message.battery_class as BatteryClass | null) ?? null,
+        chosen_importance: (message.importance as Importance | null) ?? null,
+      }),
+    );
+  });
+}
+
+async function mountAdmin(callWS = backend()) {
+  const hass = fakeHass({
+    user: { is_admin: true },
+    callWS: callWS as HomeAssistant["callWS"],
+  });
+  const sheet = await mount({ hass });
+  const saved = vi.fn();
+  sheet.addEventListener("device-saved", saved);
+  return { sheet, callWS, saved };
+}
+
+function updates(callWS: ReturnType<typeof backend>): Message[] {
+  return callWS.mock.calls
+    .map(([message]) => message)
+    .filter((message) => message.type === "battery_care/device/update");
+}
+
+function labelled(sheet: BatteryCareDeviceSheet, label: string): Element {
+  const element = [
+    ...(sheet.shadowRoot?.querySelectorAll(".customize label") ?? []),
+  ].find((item) => item.querySelector("span")?.textContent.trim() === label);
+  if (!element) {
+    throw new Error(`No field labelled ${label}`);
+  }
+  return element;
+}
+
+function select(sheet: BatteryCareDeviceSheet, label: string) {
+  const element = labelled(sheet, label).querySelector("select");
+  if (!element) {
+    throw new Error(`${label} is not a list`);
+  }
+  return element;
+}
+
+function input(sheet: BatteryCareDeviceSheet, label: string) {
+  const element = labelled(sheet, label).querySelector("input");
+  if (!element) {
+    throw new Error(`${label} is not an input`);
+  }
+  return element;
+}
+
+async function choose(
+  sheet: BatteryCareDeviceSheet,
+  element: HTMLInputElement | HTMLSelectElement,
+  value: string | boolean,
+) {
+  if (typeof value === "boolean" && element instanceof HTMLInputElement) {
+    element.checked = value;
+  } else {
+    element.value = String(value);
+  }
+  element.dispatchEvent(new Event("change"));
+  await flush();
+  await sheet.updateComplete;
+}
+
+describe("customizing a battery", () => {
+  it("is for administrators only", async () => {
+    const sheet = await mount();
+    expect(sheet.shadowRoot?.querySelector(".customize")).toBeNull();
+
+    const admin = await mountAdmin();
+    expect(texts(admin.sheet, ".customize h3")).toEqual(["Customize"]);
+    expect(select(admin.sheet, "Battery type").value).toBe("");
+    expect(
+      texts(admin.sheet, ".customize option").filter((text) =>
+        text.startsWith("Automatic"),
+      ),
+    ).toEqual(["Automatic (Replaceable)", "Automatic (Important)"]);
+    expect(texts(admin.sheet, ".customize button")).toEqual([
+      "Ignore this battery",
+    ]);
+  });
+
+  it("saves a new type and importance, keeping the other choices", async () => {
+    const { sheet, callWS, saved } = await mountAdmin();
+
+    await choose(sheet, select(sheet, "Battery type"), "ups");
+    await choose(sheet, select(sheet, "Importance"), "critical");
+
+    expect(updates(callWS)).toEqual([
+      {
+        type: "battery_care/device/update",
+        key: "d:door",
+        mode: "automatic",
+        overrides: {},
+        importance: null,
+        battery_class: "ups",
+      },
+      {
+        type: "battery_care/device/update",
+        key: "d:door",
+        mode: "automatic",
+        overrides: {},
+        importance: "critical",
+        battery_class: "ups",
+      },
+    ]);
+    expect(saved).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives a battery its own thresholds", async () => {
+    const { sheet, callWS } = await mountAdmin();
+
+    await choose(sheet, input(sheet, "Own thresholds"), true);
+    const low = input(sheet, "Low below");
+    expect(low.value).toBe("20");
+    expect([low.min, low.max]).toEqual(["1", "95"]);
+    await choose(sheet, low, "30");
+
+    expect(
+      updates(callWS).map(({ mode, overrides }) => [mode, overrides]),
+    ).toEqual([
+      ["custom", {}],
+      ["custom", { low_threshold: 30 }],
+    ]);
+    expect(input(sheet, "Low below").value).toBe("30");
+  });
+
+  it("ignores a battery, then stops ignoring it", async () => {
+    const { sheet, callWS } = await mountAdmin();
+    const button = () =>
+      sheet.shadowRoot?.querySelector<HTMLButtonElement>(".customize button");
+
+    button()?.click();
+    await flush();
+    await sheet.updateComplete;
+
+    expect(texts(sheet, ".customize p")).toEqual([
+      "Battery Care keeps showing this battery but never alerts about it.",
+    ]);
+    expect(sheet.shadowRoot?.querySelector(".customize select")).toBeNull();
+    expect(button()?.textContent.trim()).toBe("Stop ignoring");
+
+    button()?.click();
+    await flush();
+
+    expect(updates(callWS).map(({ mode }) => mode)).toEqual([
+      "ignored",
+      "automatic",
+    ]);
+  });
+
+  it("explains a refused threshold", async () => {
+    const { sheet, saved } = await mountAdmin(
+      backend("low_threshold: out_of_range"),
+    );
+    sheet.shadowRoot
+      ?.querySelector<HTMLButtonElement>(".customize button")
+      ?.click();
+    await flush();
+    await sheet.updateComplete;
+
+    expect(texts(sheet, ".customize [role=alert]")).toEqual([
+      "Choose a value between 1 and 95.",
+    ]);
+    expect(saved).not.toHaveBeenCalled();
   });
 });

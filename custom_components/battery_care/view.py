@@ -141,6 +141,7 @@ def device_details(
         "chosen_class": config.battery_class.value if config.battery_class else None,
         "suggested_importance": device.suggested_importance.value,
         "chosen_importance": config.importance.value if config.importance else None,
+        "limits": _limits(),
         "stable": device.stable,
         "last_report": max(reported).isoformat() if reported else None,
         "sources": [
@@ -159,6 +160,10 @@ def _source(source: BatterySource, state: State | None) -> dict[str, Any]:
     }
 
 
+def _limits() -> dict[str, list[int]]:
+    return {key: list(limit) for key, limit in LIMITS.items()}
+
+
 def settings_view(manager: BatteryCareManager) -> dict[str, Any]:
     """Return what the Settings page shows and edits."""
     counts = dict.fromkeys(BatteryClass, 0)
@@ -171,7 +176,7 @@ def settings_view(manager: BatteryCareManager) -> dict[str, Any]:
     return {
         "api": API_VERSION,
         "settings": asdict(manager.settings),
-        "limits": {key: list(limit) for key, limit in LIMITS.items()},
+        "limits": _limits(),
         "classes": [
             {
                 "battery_class": chosen.value,

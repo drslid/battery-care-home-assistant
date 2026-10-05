@@ -18,7 +18,8 @@ describe("parseLocation", () => {
     expect(parseLocation("", "").view).toBe("overview");
     expect(parseLocation("/all", "").view).toBe("all");
     expect(parseLocation("/all/", "").view).toBe("all");
-    expect(parseLocation("/settings", "").view).toBe("overview");
+    expect(parseLocation("/settings", "").view).toBe("settings");
+    expect(parseLocation("/other", "").view).toBe("overview");
   });
 
   it("reads the device from the query", () => {
@@ -32,6 +33,9 @@ describe("paths", () => {
   it("build links that survive a reload", () => {
     expect(viewPath("/battery-care", "overview")).toBe("/battery-care");
     expect(viewPath("/battery-care", "all")).toBe("/battery-care/all");
+    expect(viewPath("/battery-care", "settings")).toBe(
+      "/battery-care/settings",
+    );
     expect(devicePath("/battery-care", "all", "s:sensor.a b")).toBe(
       "/battery-care/all?device=s%3Asensor.a+b",
     );

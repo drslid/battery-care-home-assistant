@@ -26,6 +26,7 @@ import {
   viewPath,
   type View,
 } from "./router";
+import "./settings-page";
 import { icon } from "./status";
 import { sharedStyles } from "./styles";
 import type { Connection, HomeAssistant, Route } from "./types";
@@ -57,6 +58,7 @@ export class BatteryCarePanel extends LitElement {
     _ready: { state: true },
     _status: { state: true },
     _search: { state: true },
+    _revision: { state: true },
   };
 
   declare hass: HomeAssistant | undefined;
@@ -67,6 +69,7 @@ export class BatteryCarePanel extends LitElement {
   declare _ready: boolean;
   declare _status: FeedStatus;
   declare _search: string;
+  declare _revision: number;
 
   private feed: Feed | undefined;
   private feedConnection: Connection | undefined;
@@ -78,6 +81,7 @@ export class BatteryCarePanel extends LitElement {
     this._ready = false;
     this._status = "connecting";
     this._search = window.location.search;
+    this._revision = 0;
   }
 
   override connectedCallback(): void {
@@ -216,7 +220,7 @@ export class BatteryCarePanel extends LitElement {
           <h1>${localize(language, "panel.title")}</h1>
         </header>
         <nav class="tabs" aria-label=${localize(language, "panel.views")}>
-          ${(["overview", "all"] as const).map(
+          ${(["overview", "all", "settings"] as const).map(
             (tab) =>
               html`<a
                 class="tab"
@@ -239,6 +243,9 @@ export class BatteryCarePanel extends LitElement {
         .language=${language}
         .locale=${locale}
         @sheet-closed=${this.closeDevice}
+        @device-saved=${() => {
+          this._revision += 1;
+        }}
       ></battery-care-device-sheet>
     `;
   }
@@ -270,6 +277,14 @@ export class BatteryCarePanel extends LitElement {
     locale: string,
     view: View,
   ): TemplateResult | typeof nothing {
+    if (view === "settings") {
+      return html`<battery-care-settings
+        .hass=${this.hass}
+        .language=${language}
+        .revision=${this._revision}
+        .deviceHref=${(key: string) => devicePath(this.basePath, view, key)}
+      ></battery-care-settings>`;
+    }
     const summary = this._summary;
     if (summary === undefined || !this._ready) {
       if (this._status === "outdated" || this._status === "unavailable") {

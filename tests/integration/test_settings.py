@@ -134,6 +134,7 @@ async def test_ignoring_and_customizing_a_device(
     assert details["mode"] == "custom"
     assert details["overrides"] == {"low_threshold": 10, "critical_threshold": 5}
     assert details["inherited"]["low_threshold"] == 20
+    assert details["limits"]["critical_threshold"] == [0, 94]
     assert (details["chosen_class"], details["detected_class"]) == (
         "replaceable",
         "unknown",

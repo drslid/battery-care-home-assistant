@@ -1,4 +1,4 @@
-export type View = "overview" | "all";
+export type View = "overview" | "all" | "settings";
 
 export interface PanelLocation {
   view: View;
@@ -10,7 +10,7 @@ export function parseLocation(path: string, search: string): PanelLocation {
   const segment = path.split("/").find((part) => part !== "") ?? "";
   const device = new URLSearchParams(search).get("device");
   return {
-    view: segment === "all" ? "all" : "overview",
+    view: segment === "all" || segment === "settings" ? segment : "overview",
     device: device === "" ? null : device,
   };
 }

@@ -7,6 +7,7 @@ import {
   device,
   fakeHass,
   patch,
+  settingsView,
   snapshot,
 } from "./fake-hass";
 
@@ -121,6 +122,7 @@ describe("battery-care-panel", () => {
     expect(texts(panel, ".tab")).toEqual([
       "Vue d’ensemble",
       "Toutes les batteries",
+      "Réglages",
     ]);
     expect(texts(panel, ".summary h2")).toEqual([
       "2 batteries demandent votre attention",
@@ -229,6 +231,42 @@ describe("battery-care-panel", () => {
 
     expect(back).toHaveBeenCalledOnce();
     expect(sheet?.deviceKey).toBeNull();
+  });
+
+  it("shows the settings without waiting for the batteries", async () => {
+    const hass = fakeHass({
+      callWS: vi.fn(() =>
+        Promise.resolve(settingsView()),
+      ) as HomeAssistant["callWS"],
+    });
+    const panel = await mount({ hass, path: "/settings" });
+
+    const current = root(panel).querySelector("[aria-current=page]");
+    expect(current?.textContent.trim()).toBe("Settings");
+    const settings = root(panel).querySelector("battery-care-settings");
+    expect(settings?.hass).toBe(hass);
+    expect(root(panel).querySelector("[role=status]")).toBeNull();
+    expect(settings?.deviceHref("d:remote")).toBe(
+      "/battery-care/settings?device=d%3Aremote",
+    );
+  });
+
+  it("reloads the settings after a battery was saved", async () => {
+    const hass = fakeHass({
+      callWS: vi.fn(() =>
+        Promise.resolve(settingsView()),
+      ) as HomeAssistant["callWS"],
+    });
+    const panel = await mount({ hass, path: "/settings" });
+    const settings = root(panel).querySelector("battery-care-settings");
+    const before = settings?.revision ?? 0;
+
+    root(panel)
+      .querySelector("battery-care-device-sheet")
+      ?.dispatchEvent(new CustomEvent("device-saved"));
+    await panel.updateComplete;
+
+    expect(settings?.revision).toBe(before + 1);
   });
 
   it("ignores new hass objects that change nothing it shows", async () => {

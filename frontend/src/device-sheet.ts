@@ -7,12 +7,40 @@ import {
   type PropertyValues,
   type TemplateResult,
 } from "lit";
-import type { DeviceDetails, DeviceView, Source } from "./api";
+import { live } from "lit/directives/live.js";
+import type {
+  BatteryClass,
+  DeviceDetails,
+  DeviceMode,
+  DeviceView,
+  Importance,
+  Settings,
+  Source,
+} from "./api";
 import { formatBattery, formatLevel, formatRelative } from "./format";
 import { localize, type Language } from "./i18n";
+import { errorMessage } from "./settings-page";
 import { icon, statusIcon, statusTone } from "./status";
 import { sharedStyles } from "./styles";
 import type { HomeAssistant } from "./types";
+
+interface DeviceUpdate {
+  mode: DeviceMode;
+  overrides: Partial<Settings>;
+  importance: Importance | null;
+  battery_class: BatteryClass | null;
+}
+
+const CLASSES: BatteryClass[] = [
+  "replaceable",
+  "rechargeable",
+  "robot",
+  "vehicle",
+  "ups",
+  "home_battery",
+  "unknown",
+];
+const IMPORTANCES: Importance[] = ["low", "normal", "important", "critical"];
 
 /**
  * The read-only sheet of one battery device, opened by `?device=<key>`.
@@ -30,6 +58,7 @@ export class BatteryCareDeviceSheet extends LitElement {
     locale: { attribute: false },
     _details: { state: true },
     _failed: { state: true },
+    _saveError: { state: true },
   };
 
   declare hass: HomeAssistant | undefined;
@@ -40,6 +69,7 @@ export class BatteryCareDeviceSheet extends LitElement {
   declare locale: string;
   declare _details: DeviceDetails | undefined;
   declare _failed: boolean;
+  declare _saveError: string | undefined;
 
   private request = 0;
 
@@ -56,6 +86,7 @@ export class BatteryCareDeviceSheet extends LitElement {
     if (changed.has("deviceKey")) {
       this._details = undefined;
       this._failed = false;
+      this._saveError = undefined;
     }
     if (
       (changed.has("deviceKey") || changed.has("device")) &&
@@ -186,8 +217,182 @@ export class BatteryCareDeviceSheet extends LitElement {
             </p>`
           : nothing
       }
+      ${details && this.admin ? this.renderCustomize(details) : nothing}
       ${details ? this.renderSources(details) : nothing}
     `;
+  }
+
+  private get admin(): boolean {
+    return this.hass?.user?.is_admin === true;
+  }
+
+  /** Save the user's choices for this device; the backend keeps what matters. */
+  private async save(
+    details: DeviceDetails,
+    changes: Partial<DeviceUpdate>,
+  ): Promise<void> {
+    const update: DeviceUpdate = {
+      mode: details.mode,
+      overrides: details.overrides,
+      importance: details.chosen_importance,
+      battery_class: details.chosen_class,
+      ...changes,
+    };
+    this._saveError = undefined;
+    try {
+      const saved = await this.hass?.callWS<DeviceDetails>({
+        type: "battery_care/device/update",
+        key: details.device.key,
+        ...update,
+        overrides: update.mode === "custom" ? update.overrides : {},
+      });
+      if (saved !== undefined) {
+        this._details = saved;
+        this.dispatchEvent(
+          new CustomEvent("device-saved", {
+            detail: { key: saved.device.key },
+          }),
+        );
+      }
+    } catch (error) {
+      this._saveError = errorMessage(error, this.language, details.limits);
+    }
+  }
+
+  private renderCustomize(details: DeviceDetails): TemplateResult {
+    const { language } = this;
+    const ignored = details.mode === "ignored";
+    const custom = details.mode === "custom";
+    const threshold = (key: "low_threshold" | "critical_threshold") =>
+      html`<label class="field">
+        <span>${localize(language, `customize.${key}`)}</span>
+        <span class="input">
+          <input
+            type="number"
+            inputmode="numeric"
+            step="1"
+            min=${details.limits[key]?.[0] ?? nothing}
+            max=${details.limits[key]?.[1] ?? nothing}
+            .value=${live(String(details.overrides[key] ?? details.inherited[key] ?? ""))}
+            @change=${(event: Event) => {
+              const value = Number((event.target as HTMLInputElement).value);
+              if (Number.isInteger(value)) {
+                void this.save(details, {
+                  overrides: { ...details.overrides, [key]: value },
+                });
+              }
+            }}
+          />
+          <span class="unit secondary">%</span>
+        </span>
+      </label>`;
+    return html`<section class="customize">
+      <h3>${localize(language, "customize.title")}</h3>
+      ${
+        ignored
+          ? html`<p class="secondary">
+              ${localize(language, "customize.ignored_help")}
+            </p>`
+          : html`
+              <label class="field">
+                <span>${localize(language, "customize.type")}</span>
+                <select
+                  .value=${live(details.chosen_class ?? "")}
+                  @change=${(event: Event) => {
+                    const value = (event.target as HTMLSelectElement).value;
+                    void this.save(details, {
+                      battery_class:
+                        value === "" ? null : (value as BatteryClass),
+                    });
+                  }}
+                >
+                  <option value="" ?selected=${details.chosen_class === null}>
+                    ${localize(language, "customize.automatic", {
+                      value: localize(
+                        language,
+                        `class.${details.detected_class}`,
+                      ),
+                    })}
+                  </option>
+                  ${CLASSES.map(
+                    (value) =>
+                      html`<option
+                        value=${value}
+                        ?selected=${details.chosen_class === value}
+                      >
+                        ${localize(language, `class.${value}`)}
+                      </option>`,
+                  )}
+                </select>
+              </label>
+              <label class="field">
+                <span>${localize(language, "sheet.importance")}</span>
+                <select
+                  .value=${live(details.chosen_importance ?? "")}
+                  @change=${(event: Event) => {
+                    const value = (event.target as HTMLSelectElement).value;
+                    void this.save(details, {
+                      importance: value === "" ? null : (value as Importance),
+                    });
+                  }}
+                >
+                  <option
+                    value=""
+                    ?selected=${details.chosen_importance === null}
+                  >
+                    ${localize(language, "customize.automatic", {
+                      value: localize(
+                        language,
+                        `importance.${details.suggested_importance}`,
+                      ),
+                    })}
+                  </option>
+                  ${IMPORTANCES.map(
+                    (value) =>
+                      html`<option
+                        value=${value}
+                        ?selected=${details.chosen_importance === value}
+                      >
+                        ${localize(language, `importance.${value}`)}
+                      </option>`,
+                  )}
+                </select>
+              </label>
+              <label class="field">
+                <span>${localize(language, "customize.own_thresholds")}</span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  .checked=${live(custom)}
+                  @change=${(event: Event) => {
+                    const checked = (event.target as HTMLInputElement).checked;
+                    void this.save(details, {
+                      mode: checked ? "custom" : "automatic",
+                      overrides: {},
+                    });
+                  }}
+                />
+              </label>
+              ${custom ? threshold("low_threshold") : nothing}
+              ${custom ? threshold("critical_threshold") : nothing}
+            `
+      }
+      ${
+        this._saveError
+          ? html`<p class="message error" role="alert">${this._saveError}</p>`
+          : nothing
+      }
+      <button
+        class="text-button"
+        @click=${() =>
+          void this.save(details, {
+            mode: ignored ? "automatic" : "ignored",
+            overrides: {},
+          })}
+      >
+        ${localize(language, ignored ? "customize.stop_ignoring" : "customize.ignore")}
+      </button>
+    </section>`;
   }
 
   private fact(label: string, value: string): TemplateResult {
@@ -387,6 +592,30 @@ export class BatteryCareDeviceSheet extends LitElement {
       }
       .message {
         margin: 16px 0;
+      }
+      .customize {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        margin: 16px 0;
+        padding: 8px 0;
+        border-top: 1px solid var(--bc-divider);
+        border-bottom: 1px solid var(--bc-divider);
+      }
+      .customize h3 {
+        margin: 8px 0;
+        font-size: 16px;
+        font-weight: 500;
+      }
+      .customize .field {
+        padding: 0;
+      }
+      .customize p {
+        margin: 0 0 8px;
+      }
+      .customize .text-button {
+        align-self: flex-start;
+        margin-left: -12px;
       }
       .sources summary {
         min-height: 48px;

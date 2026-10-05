@@ -93,13 +93,56 @@ export interface DeviceDetails {
   model: string | null;
   class_reason: string;
   importance_source: "user" | "suggested" | "default";
-  mode: "automatic" | "custom" | "ignored";
+  mode: DeviceMode;
   alerts: boolean;
   low_threshold: number;
   critical_threshold: number;
+  overrides: Partial<Settings>;
+  inherited: Partial<Settings>;
+  detected_class: BatteryClass;
+  chosen_class: BatteryClass | null;
+  suggested_importance: Importance;
+  chosen_importance: Importance | null;
+  limits: Limits;
   stable: boolean;
   last_report: string | null;
   sources: Source[];
+}
+
+export type DeviceMode = "automatic" | "custom" | "ignored";
+
+/** The global settings, as the backend names them. */
+export interface Settings {
+  alerts_enabled: boolean;
+  low_threshold: number;
+  critical_threshold: number;
+  hysteresis: number;
+  binary_recovery_minutes: number;
+  reminder_hours: number;
+  unavailable_alerts: boolean;
+  unavailable_grace_hours: number;
+  stale_detection: boolean;
+  stale_days: number;
+}
+
+export interface ClassRow {
+  battery_class: BatteryClass;
+  devices: number;
+  custom: boolean;
+  alerts_enabled: boolean;
+  low_threshold: number;
+  critical_threshold: number;
+}
+
+/** The smallest and largest value allowed for each numeric setting. */
+export type Limits = Partial<Record<keyof Settings, [number, number]>>;
+
+export interface SettingsView {
+  api: number;
+  settings: Settings;
+  limits: Limits;
+  classes: ClassRow[];
+  ignored: { key: string; name: string }[];
 }
 
 /** Waiting, receiving, Battery Care not running, or this page is out of date. */

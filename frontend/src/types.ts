@@ -19,6 +19,7 @@ export interface HomeAssistant {
   callWS: <T>(message: { type: string; [key: string]: unknown }) => Promise<T>;
   dockedSidebar?: "docked" | "always_hidden" | "auto";
   kioskMode?: boolean;
+  user?: { is_admin: boolean };
   auth?: { external?: { config?: { hasSidebar?: boolean } } };
 }
 

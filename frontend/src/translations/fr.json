@@ -6,7 +6,8 @@
   },
   "nav": {
     "overview": "Vue d’ensemble",
-    "all": "Toutes les batteries"
+    "all": "Toutes les batteries",
+    "settings": "Réglages"
   },
   "feed": {
     "loading": "Chargement des batteries…",
@@ -114,5 +115,51 @@
     "charging_off": "Pas en charge",
     "unavailable": "Indisponible",
     "unknown": "Inconnu"
+  },
+  "customize": {
+    "title": "Personnaliser",
+    "type": "Type de batterie",
+    "automatic": "Automatique ({value})",
+    "own_thresholds": "Seuils propres",
+    "low_threshold": "Faible sous",
+    "critical_threshold": "Critique sous",
+    "ignore": "Ignorer cette batterie",
+    "stop_ignoring": "Ne plus ignorer",
+    "ignored_help": "Battery Care continue d’afficher cette batterie mais n’envoie jamais d’alerte à son sujet."
+  },
+  "settings": {
+    "loading": "Chargement des réglages…",
+    "load_failed": "Impossible de charger les réglages.",
+    "read_only": "Seul un administrateur peut modifier ces réglages.",
+    "classes_title": "Alertes par type de batterie",
+    "classes_help": "Chaque batterie suit son type. Pour en modifier une seule, ouvrez sa fiche.",
+    "devices": {
+      "one": "{count} batterie",
+      "other": "{count} batteries"
+    },
+    "alerts": "Alertes",
+    "low": "Faible sous",
+    "critical": "Critique sous",
+    "general_title": "Alertes et rappels",
+    "alerts_enabled": "Alertes Battery Care",
+    "reminder_hours": "Rappeler toutes les",
+    "unavailable_alerts": "Alerter quand un appareil ne répond plus",
+    "unavailable_grace_hours": "Sans réponse au bout de",
+    "stale_detection": "Alerter quand une batterie ne remonte plus rien",
+    "stale_days": "Sans relevé depuis",
+    "days": "jours",
+    "advanced_title": "Avancé",
+    "hysteresis": "Marge avant retour à la normale",
+    "binary_recovery_minutes": "Batterie faible levée au bout de",
+    "ignored_title": "Batteries ignorées",
+    "ignored_empty": "Aucune batterie n’est ignorée. Ouvrez une batterie pour l’ignorer.",
+    "stop_ignoring": "Ne plus ignorer",
+    "error": {
+      "between": "Choisissez une valeur entre {min} et {max}.",
+      "out_of_range": "Cette valeur est hors de la plage autorisée.",
+      "critical_not_below_low": "Le seuil critique doit être inférieur au seuil faible.",
+      "recovery_above_maximum": "Le seuil faible plus la marge de retour ne doit pas dépasser 100 %.",
+      "other": "Impossible d’enregistrer cette modification."
+    }
   }
 }

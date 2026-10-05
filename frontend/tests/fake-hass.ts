@@ -2,7 +2,9 @@ import { vi } from "vitest";
 import type {
   DeviceDetails,
   DeviceView,
+  Limits,
   Patch,
+  SettingsView,
   Snapshot,
   Summary,
 } from "../src/api";
@@ -144,6 +146,16 @@ export function patch(devices: DeviceView[], summary = SUMMARY): Patch {
   return { api: 1, type: "patch", summary, devices };
 }
 
+export const LIMITS: Limits = {
+  low_threshold: [1, 95],
+  critical_threshold: [0, 94],
+  hysteresis: [0, 20],
+  binary_recovery_minutes: [0, 1440],
+  reminder_hours: [6, 720],
+  unavailable_grace_hours: [1, 168],
+  stale_days: [1, 90],
+};
+
 export function details(overrides: Partial<DeviceDetails> = {}): DeviceDetails {
   return {
     api: 1,
@@ -157,6 +169,18 @@ export function details(overrides: Partial<DeviceDetails> = {}): DeviceDetails {
     alerts: true,
     low_threshold: 20,
     critical_threshold: 10,
+    overrides: {},
+    inherited: {
+      alerts_enabled: true,
+      low_threshold: 20,
+      critical_threshold: 10,
+      reminder_hours: 24,
+    },
+    detected_class: "replaceable",
+    chosen_class: null,
+    suggested_importance: "important",
+    chosen_importance: null,
+    limits: LIMITS,
     stable: true,
     last_report: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
     sources: [
@@ -175,6 +199,55 @@ export function details(overrides: Partial<DeviceDetails> = {}): DeviceDetails {
         state: "on",
       },
     ],
+    ...overrides,
+  };
+}
+
+export function settingsView(
+  overrides: Partial<SettingsView> = {},
+): SettingsView {
+  return {
+    api: 1,
+    settings: {
+      alerts_enabled: true,
+      low_threshold: 20,
+      critical_threshold: 10,
+      hysteresis: 5,
+      binary_recovery_minutes: 60,
+      reminder_hours: 24,
+      unavailable_alerts: true,
+      unavailable_grace_hours: 24,
+      stale_detection: true,
+      stale_days: 7,
+    },
+    limits: LIMITS,
+    classes: [
+      {
+        battery_class: "replaceable",
+        devices: 2,
+        custom: false,
+        alerts_enabled: true,
+        low_threshold: 20,
+        critical_threshold: 10,
+      },
+      {
+        battery_class: "ups",
+        devices: 1,
+        custom: false,
+        alerts_enabled: true,
+        low_threshold: 50,
+        critical_threshold: 20,
+      },
+      {
+        battery_class: "robot",
+        devices: 0,
+        custom: false,
+        alerts_enabled: false,
+        low_threshold: 20,
+        critical_threshold: 10,
+      },
+    ],
+    ignored: [{ key: "d:remote", name: "Remote" }],
     ...overrides,
   };
 }

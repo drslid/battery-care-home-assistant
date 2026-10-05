@@ -81,6 +81,63 @@ export const sharedStyles = css`
     clip-path: inset(50%);
     white-space: nowrap;
   }
+  .error {
+    color: var(--bc-error);
+  }
+  .field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 48px;
+    padding: 0 16px;
+  }
+  .input {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  input[type="number"],
+  select {
+    box-sizing: border-box;
+    min-height: 40px;
+    padding: 0 8px;
+    border: 1px solid var(--bc-border);
+    border-radius: 8px;
+    background: var(--bc-card);
+    color: var(--bc-text);
+    font: inherit;
+  }
+  input[type="number"] {
+    width: 5.5em;
+  }
+  select {
+    max-width: 60%;
+  }
+  input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    accent-color: var(--bc-accent);
+  }
+  :disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+  .text-button {
+    min-height: 40px;
+    padding: 0 12px;
+    border: none;
+    border-radius: 20px;
+    background: none;
+    color: var(--bc-accent);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .text-button:hover {
+    background: var(--bc-hover);
+  }
   .skeleton {
     display: block;
     border-radius: 4px;
