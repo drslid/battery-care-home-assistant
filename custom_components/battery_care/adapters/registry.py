@@ -3,9 +3,12 @@
 from dataclasses import replace
 
 from homeassistant.const import (
+    ATTR_BATTERY_LEVEL,
     ATTR_DEVICE_CLASS,
     ATTR_FRIENDLY_NAME,
     ATTR_UNIT_OF_MEASUREMENT,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
 )
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import (
@@ -15,10 +18,43 @@ from homeassistant.helpers import (
 )
 
 from ..core.discovery import discover, group_key
-from ..core.models import BatteryMetadata, DeviceRecord, EntityRecord, Inventory
+from ..core.models import (
+    BatteryMetadata,
+    BatterySource,
+    DeviceRecord,
+    EntityRecord,
+    Inventory,
+)
+from ..core.readings import parse_level, text_state
 from .battery_notes import DOMAIN as BATTERY_NOTES, parse_metadata
 
 STATE_ONLY_DOMAINS = ("sensor", "binary_sensor")
+
+
+def has_battery_level(state: State | None) -> bool:
+    """Return whether a state carries a battery percentage as an attribute."""
+    if state is None or (level := state.attributes.get(ATTR_BATTERY_LEVEL)) is None:
+        return False
+    return not isinstance(level, bool) and parse_level(str(level)) is not None
+
+
+def has_text_state(state: State | None) -> bool:
+    """Return whether a state, or its options, are battery words such as low."""
+    if state is None:
+        return False
+    options = state.attributes.get("options")
+    words = [state.state, *(options if isinstance(options, list) else [])]
+    return any(isinstance(word, str) and text_state(word) for word in words)
+
+
+def source_value(state: State | None, source: BatterySource) -> str | None:
+    """Return what a source says now, from its state or its attribute."""
+    if state is None:
+        return None
+    if source.attribute is None or state.state == STATE_UNAVAILABLE:
+        return state.state
+    value = state.attributes.get(source.attribute)
+    return STATE_UNKNOWN if value is None else str(value)
 
 
 def entity_record(entry: er.RegistryEntry, state: State | None) -> EntityRecord:
@@ -36,6 +72,8 @@ def entity_record(entry: er.RegistryEntry, state: State | None) -> EntityRecord:
         name=attributes.get(ATTR_FRIENDLY_NAME) or entry.name or entry.original_name,
         area_id=entry.area_id,
         disabled=entry.disabled_by is not None,
+        battery_level=has_battery_level(state),
+        text_state=has_text_state(state),
     )
 
 
@@ -46,6 +84,8 @@ def state_record(state: State) -> EntityRecord:
         device_class=state.attributes.get(ATTR_DEVICE_CLASS),
         unit=state.attributes.get(ATTR_UNIT_OF_MEASUREMENT),
         name=state.attributes.get(ATTR_FRIENDLY_NAME),
+        battery_level=has_battery_level(state),
+        text_state=has_text_state(state),
     )
 
 
@@ -62,8 +102,9 @@ def async_inventory(hass: HomeAssistant) -> Inventory:
     registered = {record.entity_id for record in records}
     records.extend(
         state_record(state)
-        for state in hass.states.async_all(STATE_ONLY_DOMAINS)
+        for state in hass.states.async_all()
         if state.entity_id not in registered
+        and (state.domain in STATE_ONLY_DOMAINS or has_battery_level(state))
     )
     devices, main_ids = _device_records(hass, records)
     if main_ids:

@@ -173,11 +173,48 @@ describe("device sheet", () => {
         importance_source: "default",
         stable: false,
         sources: [
-          { entity_id: "a", kind: "level", name: "A", state: "unavailable" },
-          { entity_id: "b", kind: "level", name: "B", state: null },
-          { entity_id: "c", kind: "level", name: "C", state: "bad" },
-          { entity_id: "d", kind: "charging", name: "D", state: "off" },
-          { entity_id: "e", kind: "low", name: "E", state: "weird" },
+          {
+            entity_id: "a",
+            attribute: null,
+            kind: "level",
+            name: "A",
+            state: "unavailable",
+          },
+          {
+            entity_id: "b",
+            attribute: null,
+            kind: "level",
+            name: "B",
+            state: null,
+          },
+          {
+            entity_id: "c",
+            attribute: null,
+            kind: "level",
+            name: "C",
+            state: "bad",
+          },
+          {
+            entity_id: "d",
+            attribute: null,
+            kind: "charging",
+            name: "D",
+            state: "off",
+          },
+          {
+            entity_id: "e",
+            attribute: null,
+            kind: "low",
+            name: "E",
+            state: "weird",
+          },
+          {
+            entity_id: "lock.f",
+            attribute: "battery_state",
+            kind: "state",
+            name: "F",
+            state: "Low",
+          },
         ],
       }),
     });
@@ -199,6 +236,9 @@ describe("device sheet", () => {
       "Level · bad",
       "Charging · Not charging",
       "Low battery · weird",
+      "Battery state · Low",
     ]);
+    const codes = texts(sheet, ".sources li code");
+    expect(codes[codes.length - 1]).toBe("lock.f · battery_state");
   });
 });

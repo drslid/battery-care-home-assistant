@@ -6,7 +6,6 @@ from typing import Any
 from custom_components.battery_care.core.discovery import (
     discover,
     group_key,
-    is_suggestion,
     source_kind,
 )
 from custom_components.battery_care.core.models import (
@@ -214,8 +213,8 @@ def test_own_entities_are_ignored() -> None:
     assert inventory.devices == {}
 
 
-def test_suggestions_need_a_confirmation() -> None:
-    """Percentage sensors named like batteries are only suggested."""
+def test_names_attributes_and_words_stand_in_for_missing_sources() -> None:
+    """Weaker forms are used only when a device has nothing better."""
     records = [
         level(
             "sensor.remote_batterie",
@@ -223,17 +222,65 @@ def test_suggestions_need_a_confirmation() -> None:
             name="Remote Batterie",
             device_id=None,
         ),
-        level("sensor.batt_level", device_class=None, device_id=None),
         level("sensor.door_batt", device_class=None, name="Door batt"),
         level("sensor.door_battery"),
         level("sensor.off_battery", device_class=None, disabled=True, device_id=None),
         level("sensor.humidity", device_class=None, name="Humidity", device_id=None),
+        EntityRecord("vacuum.robot", platform="roborock", battery_level=True),
+        EntityRecord(
+            "sensor.lock_battery_state",
+            platform="august",
+            registry_id="id-lock",
+            device_class="enum",
+            name="Lock battery state",
+            text_state=True,
+        ),
+        EntityRecord(
+            "sensor.hall_weather", platform="met", device_class="enum", text_state=True
+        ),
     ]
+
     inventory = discover(records, DEVICES)
 
-    assert inventory.suggestions == ("sensor.batt_level", "sensor.remote_batterie")
-    assert is_suggestion(records[0])
-    assert not is_suggestion(records[3])
+    assert inventory.devices["d:door"].sources == (
+        BatterySource("sensor.door_battery", SourceKind.LEVEL),
+    )
+    assert inventory.devices["e:id-sensor.remote_batterie"].sources == (
+        BatterySource("sensor.remote_batterie", SourceKind.LEVEL),
+    )
+    assert inventory.devices["s:vacuum.robot"].sources == (
+        BatterySource("vacuum.robot", SourceKind.LEVEL, "battery_level"),
+    )
+    assert inventory.devices["e:id-lock"].sources == (
+        BatterySource("sensor.lock_battery_state", SourceKind.STATE),
+    )
+    assert set(inventory.devices) == {
+        "d:door",
+        "e:id-lock",
+        "e:id-sensor.remote_batterie",
+        "s:vacuum.robot",
+    }
+    assert inventory.not_monitored == (
+        NotMonitored("e:id-sensor.off_battery", "sensor.off_battery", "disabled"),
+    )
+
+
+def test_the_best_weak_form_wins() -> None:
+    """Without a battery sensor, a named sensor beats an attribute and a word."""
+    records = [
+        level("sensor.robot_battery", device_class=None, name="Robot battery"),
+        level("vacuum.robot", device_class=None, unit=None, battery_level=True),
+        level(
+            "sensor.robot_battery_state",
+            device_class="battery",
+            unit=None,
+            text_state=True,
+        ),
+    ]
+
+    (device,) = discover(records, DEVICES).devices.values()
+
+    assert device.sources == (BatterySource("sensor.robot_battery", SourceKind.LEVEL),)
 
 
 def test_area_and_floor() -> None:

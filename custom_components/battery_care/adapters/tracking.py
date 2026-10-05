@@ -4,7 +4,11 @@ from collections.abc import Callable, Iterable
 import logging
 from typing import Any
 
-from homeassistant.const import ATTR_DEVICE_CLASS, ATTR_UNIT_OF_MEASUREMENT
+from homeassistant.const import (
+    ATTR_BATTERY_LEVEL,
+    ATTR_DEVICE_CLASS,
+    ATTR_UNIT_OF_MEASUREMENT,
+)
 from homeassistant.core import (
     CALLBACK_TYPE,
     Event,
@@ -106,6 +110,8 @@ class InventoryTracker:
         if (state := event.data["new_state"]) is not None and (
             state.attributes.get(ATTR_DEVICE_CLASS) in BATTERY_DEVICE_CLASSES
             or state.attributes.get(ATTR_UNIT_OF_MEASUREMENT) == "%"
+            or ATTR_BATTERY_LEVEL in state.attributes
+            or "options" in state.attributes
         ):
             self._debouncer.async_schedule_call()
 

@@ -162,12 +162,14 @@ export function details(overrides: Partial<DeviceDetails> = {}): DeviceDetails {
     sources: [
       {
         entity_id: "sensor.front_door_battery",
+        attribute: null,
         kind: "level",
         name: "Front Door Battery",
         state: "8",
       },
       {
         entity_id: "binary_sensor.front_door_battery_low",
+        attribute: null,
         kind: "low",
         name: "Front Door Battery low",
         state: "on",

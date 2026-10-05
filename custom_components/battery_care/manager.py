@@ -17,7 +17,7 @@ from homeassistant.helpers.event import (
 from homeassistant.helpers.start import async_at_started
 from homeassistant.util import dt as dt_util
 
-from .adapters.registry import async_inventory
+from .adapters.registry import async_inventory, source_value
 from .adapters.tracking import InventoryTracker
 from .const import DOMAIN
 from .core.engine import Alert, Evaluation, Observation, evaluate, make_policy
@@ -350,9 +350,8 @@ class BatteryCareManager:
         }
         self._async_evaluate_all(everything=True)
         _LOGGER.debug(
-            "Inventory: %d battery devices, %d suggestions, %d not monitored",
+            "Inventory: %d battery devices, %d not monitored",
             len(self.inventory.devices),
-            len(self.inventory.suggestions),
             len(self.inventory.not_monitored),
         )
 
@@ -408,6 +407,7 @@ class BatteryCareManager:
                 charging=reading.charging,
                 available=reading.available,
                 evidence_at=self._evidence_at(device),
+                critical=reading.critical,
             ),
             make_policy(
                 self.effective_settings(key),
@@ -504,10 +504,10 @@ class BatteryCareManager:
             )
 
     def _read(self, device: BatteryDevice) -> Reading:
-        states = {
-            source.entity_id: state.state
-            if (state := self.hass.states.get(source.entity_id))
-            else None
-            for source in device.sources
-        }
-        return read(device, states)
+        return read(
+            device,
+            {
+                source: source_value(self.hass.states.get(source.entity_id), source)
+                for source in device.sources
+            },
+        )

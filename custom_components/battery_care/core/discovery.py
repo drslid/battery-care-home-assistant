@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
+from enum import IntEnum
 import re
 
 from .classification import DeviceTraits, classify, suggest_importance
@@ -23,14 +24,31 @@ MIRROR_PLATFORMS = frozenset(
 )
 # Helpers that build a battery value: used only when the device has no native one.
 HELPER_PLATFORMS = frozenset({"compensation", "template", "threshold", "trend"})
-SUGGESTION_NAME = re.compile(r"batt|bater", re.IGNORECASE)
-KIND_ORDER = {SourceKind.LEVEL: 0, SourceKind.LOW: 1, SourceKind.CHARGING: 2}
+BATTERY_NAME = re.compile(r"batt|bater|akku|\bpiles?\b", re.IGNORECASE)
+BATTERY_LEVEL_ATTRIBUTE = "battery_level"
+KIND_ORDER = {
+    SourceKind.LEVEL: 0,
+    SourceKind.STATE: 1,
+    SourceKind.LOW: 2,
+    SourceKind.CHARGING: 3,
+}
 
-type Candidate = tuple[EntityRecord, SourceKind]
+
+class Rank(IntEnum):
+    """How far a source can be trusted; weaker ones only stand in for stronger."""
+
+    NATIVE = 0
+    HELPER = 1
+    NAMED = 2
+    ATTRIBUTE = 3
+    TEXT = 4
+
+
+type Candidate = tuple[EntityRecord, BatterySource, Rank]
 
 
 def source_kind(entity: EntityRecord) -> SourceKind | None:
-    """Return what the entity says about a battery, if anything."""
+    """Return what the device class of an entity says about a battery, if anything."""
     if entity.domain == "sensor":
         if entity.device_class == "battery" and entity.unit == "%":
             return SourceKind.LEVEL
@@ -51,29 +69,58 @@ def group_key(entity: EntityRecord) -> str:
     return f"s:{entity.entity_id}"
 
 
-def is_suggestion(entity: EntityRecord) -> bool:
-    """Return whether a percentage sensor without device class looks like a battery."""
-    return (
-        entity.domain == "sensor"
-        and entity.device_class is None
-        and entity.unit == "%"
-        and SUGGESTION_NAME.search(entity.name or entity.entity_id) is not None
-    )
+def named_like_a_battery(entity: EntityRecord) -> bool:
+    """Return whether the name of an entity says it is about a battery."""
+    return BATTERY_NAME.search(entity.name or entity.entity_id) is not None
+
+
+def candidates_of(entity: EntityRecord) -> list[Candidate]:
+    """Return the battery sources an entity can provide, with their trust."""
+    found: list[Candidate] = []
+    if (kind := source_kind(entity)) is not None:
+        rank = Rank.HELPER if entity.platform in HELPER_PLATFORMS else Rank.NATIVE
+        found.append((entity, BatterySource(entity.entity_id, kind), rank))
+    elif entity.domain == "sensor":
+        named = named_like_a_battery(entity)
+        if named and entity.device_class is None and entity.unit == "%":
+            source = BatterySource(entity.entity_id, SourceKind.LEVEL)
+            found.append((entity, source, Rank.NAMED))
+        elif entity.text_state and (
+            entity.device_class == "battery"
+            or (named and entity.device_class in (None, "enum"))
+        ):
+            source = BatterySource(entity.entity_id, SourceKind.STATE)
+            found.append((entity, source, Rank.TEXT))
+    if entity.battery_level:
+        source = BatterySource(
+            entity.entity_id, SourceKind.LEVEL, BATTERY_LEVEL_ATTRIBUTE
+        )
+        found.append((entity, source, Rank.ATTRIBUTE))
+    return found
 
 
 def _drop_redundant_helpers(candidates: list[Candidate]) -> list[Candidate]:
     """Keep helper sources only where the device has no native equivalent."""
-    native = {
-        kind for entity, kind in candidates if entity.platform not in HELPER_PLATFORMS
-    }
+    native = {source.kind for _, source, rank in candidates if rank is Rank.NATIVE}
     return [
-        (entity, kind)
-        for entity, kind in candidates
-        if entity.platform not in HELPER_PLATFORMS
+        (entity, source, rank)
+        for entity, source, rank in candidates
+        if rank is not Rank.HELPER
         or not (
-            kind in native or (kind is SourceKind.LOW and SourceKind.LEVEL in native)
+            source.kind in native
+            or (source.kind is SourceKind.LOW and SourceKind.LEVEL in native)
         )
     ]
+
+
+def _select(candidates: list[Candidate]) -> list[Candidate]:
+    """Keep the trusted sources; weaker kinds only stand in when there are none."""
+    charging = [item for item in candidates if item[1].kind is SourceKind.CHARGING]
+    values = [item for item in candidates if item[1].kind is not SourceKind.CHARGING]
+    if trusted := [item for item in values if item[2] <= Rank.HELPER]:
+        return _drop_redundant_helpers(trusted + charging)
+    best = min(rank for _, _, rank in values)
+    return [item for item in values if item[2] == best] + charging
 
 
 def _name(candidates: list[Candidate], device: DeviceRecord | None) -> str:
@@ -93,14 +140,23 @@ def _build(
     metadata: BatteryMetadata | None,
 ) -> BatteryDevice:
     ordered = sorted(
-        candidates, key=lambda item: (KIND_ORDER[item[1]], item[0].entity_id)
+        candidates,
+        key=lambda item: (
+            KIND_ORDER[item[1].kind],
+            item[1].entity_id,
+            item[1].attribute or "",
+        ),
     )
     primary = next(
-        entity for entity, kind in ordered if kind is not SourceKind.CHARGING
+        entity
+        for entity, source, _ in ordered
+        if source.kind is not SourceKind.CHARGING
     )
     traits = DeviceTraits(
         integration=primary.platform,
-        has_charging=any(kind is SourceKind.CHARGING for _, kind in ordered),
+        has_charging=any(
+            source.kind is SourceKind.CHARGING for _, source, _ in ordered
+        ),
         domains=frozenset(entity.domain for entity in siblings),
         device_classes=frozenset(
             (entity.domain, entity.device_class)
@@ -110,19 +166,17 @@ def _build(
         battery_type=metadata.battery_type if metadata else None,
     )
     battery_class, reason = classify(traits)
-    area_id = next((entity.area_id for entity, _ in ordered if entity.area_id), None)
+    area_id = next((entity.area_id for entity, _, _ in ordered if entity.area_id), None)
     if area_id is None and device is not None:
         area_id = device.area_id
-    platforms = {entity.platform for entity, _ in ordered}
-    evidence = {entity.entity_id for entity, _ in ordered} | {
+    platforms = {entity.platform for entity, _, _ in ordered}
+    evidence = {entity.entity_id for entity, _, _ in ordered} | {
         entity.entity_id for entity in siblings if entity.platform in platforms
     }
     return BatteryDevice(
         key=key,
         name=_name(ordered, device),
-        sources=tuple(
-            BatterySource(entity.entity_id, kind) for entity, kind in ordered
-        ),
+        sources=tuple(source for _, source, _ in ordered),
         battery_class=battery_class,
         class_reason=reason,
         suggested_importance=suggest_importance(traits),
@@ -154,54 +208,37 @@ def discover(
     """
     candidates: dict[str, list[Candidate]] = defaultdict(list)
     siblings: dict[str, list[EntityRecord]] = defaultdict(list)
-    possible_suggestions: list[EntityRecord] = []
     for entity in entities:
         if entity.device_id and not entity.disabled:
             siblings[entity.device_id].append(entity)
         if entity.platform == OWN_PLATFORM or entity.platform in MIRROR_PLATFORMS:
             continue
-        kind = source_kind(entity)
-        if kind is not None:
-            candidates[group_key(entity)].append((entity, kind))
-        elif not entity.disabled and is_suggestion(entity):
-            possible_suggestions.append(entity)
+        if found := candidates_of(entity):
+            candidates[group_key(entity)].extend(found)
 
-    found: dict[str, BatteryDevice] = {}
+    found_devices: dict[str, BatteryDevice] = {}
     not_monitored: list[NotMonitored] = []
     for key, group in candidates.items():
         device_id = group[0][0].device_id
         device = devices.get(device_id) if device_id else None
         device_disabled = device is not None and device.disabled
-        active = [
-            (entity, kind)
-            for entity, kind in group
-            if not (entity.disabled or device_disabled)
-        ]
-        if not any(kind is not SourceKind.CHARGING for _, kind in active):
-            if any(kind is not SourceKind.CHARGING for _, kind in group):
+        active = [item for item in group if not (item[0].disabled or device_disabled)]
+        if not any(source.kind is not SourceKind.CHARGING for _, source, _ in active):
+            if any(source.kind is not SourceKind.CHARGING for _, source, _ in group):
                 not_monitored.append(
                     NotMonitored(key, _name(group, device), "disabled")
                 )
             continue
-        found[key] = _build(
+        found_devices[key] = _build(
             key,
-            _drop_redundant_helpers(active),
+            _select(active),
             device=device,
             siblings=siblings.get(device_id, []) if device_id else [],
             floors=floors or {},
             metadata=(metadata or {}).get(key),
         )
 
-    suggestions = sorted(
-        entity.entity_id
-        for entity in possible_suggestions
-        if not (
-            (battery_device := found.get(group_key(entity)))
-            and battery_device.entity_ids(SourceKind.LEVEL)
-        )
-    )
     return Inventory(
-        devices=dict(sorted(found.items())),
-        suggestions=tuple(suggestions),
+        devices=dict(sorted(found_devices.items())),
         not_monitored=tuple(sorted(not_monitored, key=lambda item: item.key)),
     )

@@ -75,10 +75,11 @@ interface Closed {
 
 type FeedMessage = Snapshot | Patch | Closed;
 
-export type SourceKind = "level" | "low" | "charging";
+export type SourceKind = "level" | "low" | "charging" | "state";
 
 export interface Source {
   entity_id: string;
+  attribute: string | null;
   kind: SourceKind;
   name: string;
   state: string | null;

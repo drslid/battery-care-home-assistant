@@ -731,6 +731,7 @@ var W = {
 			level: "Level",
 			low: "Low battery",
 			charging: "Charging",
+			state: "Battery state",
 			low_on: "Low",
 			low_off: "Normal",
 			charging_on: "Charging",
@@ -846,6 +847,7 @@ var W = {
 			level: "Niveau",
 			low: "Batterie faible",
 			charging: "Charge",
+			state: "État de la batterie",
 			low_on: "Faible",
 			low_off: "Normale",
 			charging_on: "En charge",
@@ -1150,7 +1152,9 @@ var ot = oe`
                   >${K(t, `source.${e.kind}`)} ·
                   ${this.sourceState(e)}</span
                 >
-                <code class="secondary">${e.entity_id}</code>
+                <code class="secondary"
+                  >${e.attribute ? `${e.entity_id} · ${e.attribute}` : e.entity_id}</code
+                >
               </li>`)}
         </ul>
       </details>

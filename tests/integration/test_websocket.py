@@ -330,7 +330,13 @@ async def test_device_details(
     assert details["stable"] is True
     assert dt_util.parse_datetime(details["last_report"]) is not None
     assert details["sources"] == [
-        {"entity_id": level_id, "kind": "level", "name": "door battery", "state": "8"}
+        {
+            "entity_id": level_id,
+            "attribute": None,
+            "kind": "level",
+            "name": "door battery",
+            "state": "8",
+        }
     ]
 
     manager.async_configure_device(

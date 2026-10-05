@@ -10,6 +10,8 @@ class SourceKind(StrEnum):
     LEVEL = "level"
     LOW = "low"
     CHARGING = "charging"
+    # A text such as "low" or "full" instead of a percentage.
+    STATE = "state"
 
 
 class BatteryClass(StrEnum):
@@ -46,6 +48,10 @@ class EntityRecord:
     name: str | None = None
     area_id: str | None = None
     disabled: bool = False
+    # The state has a numeric battery_level attribute, as older integrations write.
+    battery_level: bool = False
+    # The state, or the options, are battery words such as "low" or "full".
+    text_state: bool = False
 
     @property
     def domain(self) -> str:
@@ -80,6 +86,8 @@ class BatterySource:
 
     entity_id: str
     kind: SourceKind
+    # The value is in this attribute instead of the state.
+    attribute: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,5 +134,4 @@ class Inventory:
     """Everything discovery found."""
 
     devices: dict[str, BatteryDevice]
-    suggestions: tuple[str, ...] = ()
     not_monitored: tuple[NotMonitored, ...] = ()

@@ -141,6 +141,23 @@ async def test_choosing_automatic_again_removes_the_device_record(
     assert hass_storage[CONFIG_KEY]["data"]["devices"] == {}
 
 
+async def test_built_in_class_values_are_not_stored(
+    hass: HomeAssistant, hass_storage: dict[str, Any]
+) -> None:
+    """Setting a class back to its built-in values removes its record."""
+    entry, manager = await start(hass)
+
+    manager.async_update_class(BatteryClass.VEHICLE, {"alerts_enabled": True})
+    assert manager.config.classes == {BatteryClass.VEHICLE: {"alerts_enabled": True}}
+    settings = manager.async_update_class(
+        BatteryClass.VEHICLE, {"alerts_enabled": False}
+    )
+    await restart(hass, entry)
+
+    assert not settings.alerts_enabled
+    assert hass_storage[CONFIG_KEY]["data"]["classes"] == {}
+
+
 async def test_invalid_stored_values_fall_back_to_defaults(
     hass: HomeAssistant, hass_storage: dict[str, Any], caplog: pytest.LogCaptureFixture
 ) -> None:

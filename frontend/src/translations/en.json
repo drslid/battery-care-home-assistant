@@ -107,6 +107,7 @@
     "level": "Level",
     "low": "Low battery",
     "charging": "Charging",
+    "state": "Battery state",
     "low_on": "Low",
     "low_off": "Normal",
     "charging_on": "Charging",

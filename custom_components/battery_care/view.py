@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import area_registry as ar
 from homeassistant.loader import IntegrationNotLoaded, async_get_loaded_integration
 
+from .adapters.registry import source_value
 from .core.models import BatterySource, Importance
 from .core.policy import battery_class, importance
 from .core.status import needs_attention
@@ -129,7 +130,8 @@ def device_details(
 def _source(source: BatterySource, state: State | None) -> dict[str, Any]:
     return {
         "entity_id": source.entity_id,
+        "attribute": source.attribute,
         "kind": source.kind.value,
         "name": state.name if state else source.entity_id,
-        "state": state.state if state else None,
+        "state": source_value(state, source),
     }

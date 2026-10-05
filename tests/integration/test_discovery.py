@@ -306,3 +306,46 @@ async def test_a_large_home_is_inventoried_quickly(hass: HomeAssistant) -> None:
 
     assert len(inventory.devices) == 1000
     assert elapsed < INVENTORY_BUDGET
+
+
+async def test_attributes_and_text_states_are_followed(hass: HomeAssistant) -> None:
+    """A vacuum with a battery attribute and a lock with a text state are read."""
+    robot = add_device(hass, "Robot", integration="roborock")
+    vacuum_id = add_entity(
+        hass,
+        "robot",
+        "docked",
+        domain="vacuum",
+        platform="roborock",
+        device_id=robot.id,
+        attributes={"battery_level": 80},
+    )
+    lock = add_device(hass, "Front Door", integration="august")
+    state_id = add_entity(
+        hass,
+        "door_battery_state",
+        "Full",
+        platform="august",
+        device_id=lock.id,
+        attributes={
+            "device_class": "enum",
+            "friendly_name": "Front Door battery state",
+            "options": ["Full", "Low", "Empty"],
+        },
+    )
+    # A registered entity without any state yet is simply not a battery.
+    er.async_get(hass).async_get_or_create("sensor", "august", "no_state_yet")
+    manager = await setup_battery_care(hass)
+    robot_key, lock_key = f"d:{robot.id}", f"d:{lock.id}"
+
+    assert manager.inventory.devices[robot_key].battery_class is BatteryClass.ROBOT
+    assert manager.readings[robot_key].level == 80
+    assert manager.readings[lock_key].low is False
+
+    hass.states.async_set(vacuum_id, "cleaning", {"battery_level": 35})
+    hass.states.async_set(state_id, "Empty", {"device_class": "enum"})
+    await hass.async_block_till_done()
+
+    assert manager.readings[robot_key].level == 35
+    assert manager.readings[lock_key].critical is True
+    assert manager.status(lock_key).value == "critical"

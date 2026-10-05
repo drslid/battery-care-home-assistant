@@ -46,6 +46,8 @@ class Observation:
     available: bool
     # The latest report that proves the device is alive, if any.
     evidence_at: datetime | None = None
+    # A text state such as "empty", which has no level to compare.
+    critical: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -221,6 +223,8 @@ def _rate_battery(
         runtime.last_low or runtime.low_off_since is not None
     ):
         severity = Severity.LOW
+    if observation.critical:
+        severity = Severity.CRITICAL
     if RANK[severity] > RANK[before.severity]:
         outcome.alerts.append(
             Alert(

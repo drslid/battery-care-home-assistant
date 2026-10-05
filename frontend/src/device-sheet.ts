@@ -270,7 +270,13 @@ export class BatteryCareDeviceSheet extends LitElement {
                   >${localize(language, `source.${source.kind}`)} ·
                   ${this.sourceState(source)}</span
                 >
-                <code class="secondary">${source.entity_id}</code>
+                <code class="secondary"
+                  >${
+                    source.attribute
+                      ? `${source.entity_id} · ${source.attribute}`
+                      : source.entity_id
+                  }</code
+                >
               </li>`,
           )}
         </ul>
