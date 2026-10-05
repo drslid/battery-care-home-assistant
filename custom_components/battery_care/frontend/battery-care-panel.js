@@ -695,7 +695,10 @@ var W = {
 		class: {
 			replaceable: "Replaceable",
 			rechargeable: "Rechargeable",
-			not_maintained: "Not maintained",
+			robot: "Robot",
+			vehicle: "Vehicle",
+			ups: "UPS",
+			home_battery: "Home battery",
 			unknown: "Unknown"
 		},
 		class_reason: {
@@ -807,7 +810,10 @@ var W = {
 		class: {
 			replaceable: "Remplaçable",
 			rechargeable: "Rechargeable",
-			not_maintained: "Sans entretien",
+			robot: "Robot",
+			vehicle: "Véhicule",
+			ups: "Onduleur",
+			home_battery: "Batterie domestique",
 			unknown: "Inconnue"
 		},
 		class_reason: {

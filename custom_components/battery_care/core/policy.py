@@ -29,8 +29,21 @@ OVERRIDABLE = frozenset(
         "unavailable_grace_hours",
     }
 )
-# Charging is part of using these devices; alerts are opt-in for them.
-QUIET_CLASSES = frozenset({BatteryClass.NOT_MAINTAINED, BatteryClass.RECHARGEABLE})
+CLASS_KEYS = frozenset({"alerts_enabled", "critical_threshold", "low_threshold"})
+# Built-in defaults of each class, over the global settings (D-007).
+CLASS_DEFAULTS: dict[BatteryClass, dict[str, Any]] = {
+    BatteryClass.RECHARGEABLE: {"alerts_enabled": False},
+    BatteryClass.ROBOT: {"alerts_enabled": False},
+    BatteryClass.VEHICLE: {"alerts_enabled": False},
+    BatteryClass.UPS: {"low_threshold": 50, "critical_threshold": 20},
+    BatteryClass.HOME_BATTERY: {
+        "alerts_enabled": False,
+        "low_threshold": 10,
+        "critical_threshold": 5,
+    },
+}
+
+type ClassChoices = Mapping[BatteryClass, Mapping[str, Any]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,18 +74,38 @@ def importance(device: BatteryDevice, config: DeviceConfig) -> Importance:
     return config.importance or device.suggested_importance
 
 
-def automatic_settings(settings: Settings, chosen_class: BatteryClass) -> Settings:
-    """Return the global settings as they apply to a device of this class."""
-    if chosen_class in QUIET_CLASSES:
-        return replace(settings, alerts_enabled=False)
+def class_settings(
+    settings: Settings, chosen_class: BatteryClass, classes: ClassChoices
+) -> Settings:
+    """Return the settings of a class: global, then built-in, then the user's."""
+    builtin = replace(settings, **CLASS_DEFAULTS.get(chosen_class, {}))
+    merged = replace(builtin, **classes.get(chosen_class, {}))
+    if not settings.alerts_enabled:
+        merged = replace(merged, alerts_enabled=False)
+    return _keep_valid_thresholds(merged, builtin)
+
+
+def _keep_valid_thresholds(settings: Settings, fallback: Settings) -> Settings:
+    """Use the fallback pair when a later change made the thresholds contradict."""
+    try:
+        check_combination(settings)
+    except SettingsError:
+        return replace(
+            settings,
+            low_threshold=fallback.low_threshold,
+            critical_threshold=fallback.critical_threshold,
+        )
     return settings
 
 
 def effective_settings(
-    settings: Settings, device: BatteryDevice, config: DeviceConfig
+    settings: Settings,
+    device: BatteryDevice,
+    config: DeviceConfig,
+    classes: ClassChoices,
 ) -> Settings:
     """Return the settings the alert engine applies to this device."""
-    base = automatic_settings(settings, battery_class(device, config))
+    base = class_settings(settings, battery_class(device, config), classes)
     if config.mode is DeviceMode.IGNORED:
         return replace(base, alerts_enabled=False)
     if config.mode is DeviceMode.AUTOMATIC or not config.overrides:
@@ -80,16 +113,7 @@ def effective_settings(
     merged = replace(base, **config.overrides)
     if not settings.alerts_enabled:
         merged = replace(merged, alerts_enabled=False)
-    try:
-        check_combination(merged)
-    except SettingsError:
-        # A later global change can contradict a device's pair: use the global one.
-        merged = replace(
-            merged,
-            low_threshold=base.low_threshold,
-            critical_threshold=base.critical_threshold,
-        )
-    return merged
+    return _keep_valid_thresholds(merged, base)
 
 
 def check_override(key: str, value: object) -> None:
@@ -102,6 +126,7 @@ def check_override(key: str, value: object) -> None:
 def make_config(
     settings: Settings,
     device: BatteryDevice,
+    classes: ClassChoices,
     *,
     mode: DeviceMode,
     overrides: Mapping[str, Any] | None = None,
@@ -114,7 +139,7 @@ def make_config(
         raise SettingsError("overrides_need_custom_mode", "overrides")
     for key, value in overrides.items():
         check_override(key, value)
-    base = automatic_settings(settings, chosen_class or device.battery_class)
+    base = class_settings(settings, chosen_class or device.battery_class, classes)
     check_combination(replace(base, **overrides))
     return DeviceConfig(
         mode=mode,
@@ -126,6 +151,71 @@ def make_config(
         importance=chosen_importance,
         battery_class=chosen_class,
     )
+
+
+def check_class_value(key: str, value: object) -> None:
+    """Raise SettingsError unless a battery class may set this setting so."""
+    if key not in CLASS_KEYS:
+        raise SettingsError("not_a_class_setting", key)
+    check_value(key, value)
+
+
+def make_class_choice(
+    settings: Settings, chosen_class: BatteryClass, changes: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Validate the user's settings for a class; keep what differs from built-in."""
+    for key, value in changes.items():
+        check_class_value(key, value)
+    builtin = replace(settings, **CLASS_DEFAULTS.get(chosen_class, {}))
+    check_combination(replace(builtin, **changes))
+    return {
+        key: value for key, value in changes.items() if getattr(builtin, key) != value
+    }
+
+
+def classes_from_storage(
+    raw: object,
+) -> tuple[dict[BatteryClass, dict[str, Any]], list[str]]:
+    """Rebuild the user's settings per class, dropping whatever is invalid.
+
+    Returns:
+        The settings by class, and the dotted names of the values that were ignored.
+    """
+    if raw is None:
+        return {}, []
+    if not isinstance(raw, Mapping):
+        return {}, ["*"]
+    classes: dict[BatteryClass, dict[str, Any]] = {}
+    problems: list[str] = []
+    for name, stored in raw.items():
+        try:
+            chosen_class = BatteryClass(name)
+        except ValueError:
+            problems.append(str(name))
+            continue
+        if not isinstance(stored, Mapping):
+            problems.append(str(name))
+            continue
+        choice: dict[str, Any] = {}
+        for key, value in stored.items():
+            try:
+                check_class_value(str(key), value)
+            except SettingsError:
+                problems.append(f"{name}.{key}")
+            else:
+                choice[key] = value
+        if choice:
+            classes[chosen_class] = choice
+    return classes, problems
+
+
+def classes_to_storage(classes: ClassChoices) -> dict[str, Any]:
+    """Return the storage form of the user's settings per class."""
+    return {
+        chosen_class.value: dict(choice)
+        for chosen_class, choice in classes.items()
+        if choice
+    }
 
 
 def config_from_storage(raw: object) -> tuple[DeviceConfig, list[str]]:

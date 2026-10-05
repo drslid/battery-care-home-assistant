@@ -28,8 +28,10 @@ from .core.policy import (
     AUTOMATIC,
     DeviceConfig,
     DeviceMode,
+    class_settings,
     effective_settings,
     importance,
+    make_class_choice,
     make_config,
 )
 from .core.readings import Reading, read
@@ -177,7 +179,10 @@ class BatteryCareManager:
     def effective_settings(self, key: str) -> Settings:
         """Return the settings that apply to one battery device."""
         return effective_settings(
-            self.config.settings, self.inventory.devices[key], self.device_config(key)
+            self.config.settings,
+            self.inventory.devices[key],
+            self.device_config(key),
+            self.config.classes,
         )
 
     def status(self, key: str) -> Status:
@@ -212,6 +217,7 @@ class BatteryCareManager:
         config = make_config(
             self.config.settings,
             device,
+            self.config.classes,
             mode=mode,
             overrides=overrides,
             chosen_importance=importance,
@@ -224,6 +230,24 @@ class BatteryCareManager:
         self._async_save_config()
         self._async_evaluate_all(everything=True)
         return config
+
+    @callback
+    def async_update_class(
+        self, chosen_class: BatteryClass, changes: Mapping[str, Any]
+    ) -> Settings:
+        """Change the settings of a battery class; raise SettingsError if invalid."""
+        choice = make_class_choice(
+            self.config.settings,
+            chosen_class,
+            {**self.config.classes.get(chosen_class, {}), **changes},
+        )
+        if choice:
+            self.config.classes[chosen_class] = choice
+        else:
+            self.config.classes.pop(chosen_class, None)
+        self._async_save_config()
+        self._async_evaluate_all(everything=True)
+        return class_settings(self.config.settings, chosen_class, self.config.classes)
 
     @callback
     def _async_save_config(self) -> None:

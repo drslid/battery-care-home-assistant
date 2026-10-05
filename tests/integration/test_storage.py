@@ -15,7 +15,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.battery_care.const import DOMAIN, NAME
-from custom_components.battery_care.core.models import Importance
+from custom_components.battery_care.core.models import BatteryClass, Importance
 from custom_components.battery_care.core.policy import DeviceMode
 from custom_components.battery_care.core.runtime import Runtime, Severity
 from custom_components.battery_care.core.settings import SettingsError
@@ -75,9 +75,10 @@ async def test_choices_survive_a_restart(
     manager.async_configure_device(
         key,
         mode=DeviceMode.CUSTOM,
-        overrides={"low_threshold": 30, "reminder_hours": 72},
+        overrides={"low_threshold": 30, "reminder_hours": 24},
         importance=Importance.CRITICAL,
     )
+    manager.async_update_class(BatteryClass.UPS, {"critical_threshold": 30})
     manager = await restart(hass, entry)
 
     assert hass_storage[CONFIG_KEY]["data"] == {
@@ -89,10 +90,12 @@ async def test_choices_survive_a_restart(
                 "importance": "critical",
             }
         },
+        "classes": {"ups": {"critical_threshold": 30}},
     }
     assert manager.settings.low_threshold == 25
     assert manager.effective_settings(key).low_threshold == 30
     assert manager.device_config(key).importance is Importance.CRITICAL
+    assert manager.config.classes == {BatteryClass.UPS: {"critical_threshold": 30}}
 
 
 async def test_changes_are_written_after_a_short_delay(

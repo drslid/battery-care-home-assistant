@@ -16,7 +16,7 @@ class Settings:
     critical_threshold: int = 10
     hysteresis: int = 5
     binary_recovery_minutes: int = 60
-    reminder_hours: int = 72
+    reminder_hours: int = 24
     unavailable_alerts: bool = True
     unavailable_grace_hours: int = 24
     stale_detection: bool = True

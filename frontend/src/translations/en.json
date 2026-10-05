@@ -71,7 +71,10 @@
   "class": {
     "replaceable": "Replaceable",
     "rechargeable": "Rechargeable",
-    "not_maintained": "Not maintained",
+    "robot": "Robot",
+    "vehicle": "Vehicle",
+    "ups": "UPS",
+    "home_battery": "Home battery",
     "unknown": "Unknown"
   },
   "class_reason": {

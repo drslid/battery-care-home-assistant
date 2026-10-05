@@ -363,7 +363,7 @@ def test_the_first_run_takes_states_silently() -> None:
 
     assert result.runtime.severity is Severity.CRITICAL
     assert (result.alerts, result.recovered) == ((), ())
-    assert result.runtime.next_reminder_at == NOW + timedelta(hours=72)
+    assert result.runtime.next_reminder_at == NOW + timedelta(hours=24)
 
 
 def test_without_alerts_the_engine_only_keeps_track() -> None:

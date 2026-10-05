@@ -15,23 +15,43 @@ from custom_components.battery_care.core.models import BatteryClass, Importance
     ("traits", "expected"),
     [
         (
+            DeviceTraits(integration="nut", has_charging=True),
+            (BatteryClass.UPS, "integration"),
+        ),
+        (
+            DeviceTraits(integration="renault", has_charging=True),
+            (BatteryClass.VEHICLE, "integration"),
+        ),
+        (
+            DeviceTraits(
+                integration="teslemetry",
+                has_charging=True,
+                domains=frozenset({"device_tracker", "sensor"}),
+            ),
+            (BatteryClass.VEHICLE, "integration"),
+        ),
+        (
+            DeviceTraits(integration="tesla_fleet", has_charging=True),
+            (BatteryClass.HOME_BATTERY, "integration"),
+        ),
+        (
+            DeviceTraits(integration="powerwall"),
+            (BatteryClass.HOME_BATTERY, "integration"),
+        ),
+        (
             DeviceTraits(
                 has_charging=True,
                 device_classes=frozenset({("sensor", "energy_storage")}),
             ),
-            (BatteryClass.NOT_MAINTAINED, "energy_storage"),
+            (BatteryClass.HOME_BATTERY, "energy_storage"),
         ),
         (
-            DeviceTraits(integration="tesla_fleet", has_charging=True),
-            (BatteryClass.NOT_MAINTAINED, "integration"),
+            DeviceTraits(domains=frozenset({"vacuum", "sensor"}), has_charging=True),
+            (BatteryClass.ROBOT, "robot"),
         ),
         (
             DeviceTraits(integration="zha", has_charging=True),
             (BatteryClass.RECHARGEABLE, "charging_sensor"),
-        ),
-        (
-            DeviceTraits(domains=frozenset({"vacuum", "sensor"})),
-            (BatteryClass.RECHARGEABLE, "robot"),
         ),
         (
             DeviceTraits(integration="mobile_app"),
@@ -51,7 +71,7 @@ from custom_components.battery_care.core.models import BatteryClass, Importance
     ],
 )
 def test_classify(traits: DeviceTraits, expected: tuple[BatteryClass, str]) -> None:
-    """Storage and vehicles first, then charging evidence, then the battery type."""
+    """Known integrations first, then robots, charging evidence and battery type."""
     assert classify(traits) == expected
 
 

@@ -13,11 +13,14 @@ class SourceKind(StrEnum):
 
 
 class BatteryClass(StrEnum):
-    """How the battery of a device is maintained."""
+    """What kind of battery a device has; it decides the default alerts."""
 
     REPLACEABLE = "replaceable"
     RECHARGEABLE = "rechargeable"
-    NOT_MAINTAINED = "not_maintained"
+    ROBOT = "robot"
+    VEHICLE = "vehicle"
+    UPS = "ups"
+    HOME_BATTERY = "home_battery"
     UNKNOWN = "unknown"
 
 

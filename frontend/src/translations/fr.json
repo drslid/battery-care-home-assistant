@@ -71,7 +71,10 @@
   "class": {
     "replaceable": "Remplaçable",
     "rechargeable": "Rechargeable",
-    "not_maintained": "Sans entretien",
+    "robot": "Robot",
+    "vehicle": "Véhicule",
+    "ups": "Onduleur",
+    "home_battery": "Batterie domestique",
     "unknown": "Inconnue"
   },
   "class_reason": {

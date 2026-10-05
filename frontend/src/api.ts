@@ -14,7 +14,13 @@ export type Status =
   | "ignored";
 
 export type BatteryClass =
-  "replaceable" | "rechargeable" | "not_maintained" | "unknown";
+  | "replaceable"
+  | "rechargeable"
+  | "robot"
+  | "vehicle"
+  | "ups"
+  | "home_battery"
+  | "unknown";
 
 export type Importance = "low" | "normal" | "important" | "critical";
 

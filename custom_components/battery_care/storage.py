@@ -9,7 +9,14 @@ from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
 from .core.known import KnownDevice, known_from_storage, known_to_storage
-from .core.policy import DeviceConfig, config_from_storage, config_to_storage
+from .core.models import BatteryClass
+from .core.policy import (
+    DeviceConfig,
+    classes_from_storage,
+    classes_to_storage,
+    config_from_storage,
+    config_to_storage,
+)
 from .core.runtime import Runtime, runtime_from_storage, runtime_to_storage
 from .core.settings import (
     DEFAULTS,
@@ -44,6 +51,7 @@ class ConfigData:
 
     settings: Settings = DEFAULTS
     devices: dict[str, DeviceConfig] = field(default_factory=dict)
+    classes: dict[BatteryClass, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -78,7 +86,9 @@ def config_from_raw(raw: object) -> tuple[ConfigData, list[str]]:
         problems.extend(f"devices.{key}.{name}" for name in device_problems)
         if isinstance(key, str) and not config.is_default:
             devices[key] = config
-    return ConfigData(settings, devices), problems
+    classes, class_problems = classes_from_storage(raw.get("classes"))
+    problems.extend(f"classes.{name}" for name in class_problems)
+    return ConfigData(settings, devices, classes), problems
 
 
 def config_to_raw(data: ConfigData) -> dict[str, Any]:
@@ -88,6 +98,7 @@ def config_to_raw(data: ConfigData) -> dict[str, Any]:
         "devices": {
             key: config_to_storage(config) for key, config in data.devices.items()
         },
+        "classes": classes_to_storage(data.classes),
     }
 
 

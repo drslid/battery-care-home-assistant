@@ -5,24 +5,25 @@ from dataclasses import dataclass
 
 from .models import BatteryClass, Importance
 
-# Battery-class entities of these integrations are home storage, vehicles or UPS.
-NOT_MAINTAINED_INTEGRATIONS = frozenset(
+UPS_INTEGRATIONS = frozenset({"apcupsd", "nut"})
+VEHICLE_INTEGRATIONS = frozenset(
+    {"bmw_connected_drive", "mazda", "nissan_leaf", "renault", "subaru", "volvo"}
+)
+# These serve both cars and Powerwalls; only the cars have a location.
+TESLA_INTEGRATIONS = frozenset({"tesla_fleet", "teslemetry", "tessie"})
+HOME_BATTERY_INTEGRATIONS = frozenset(
     {
-        "apcupsd",
-        "bmw_connected_drive",
         "enphase_envoy",
         "fronius",
         "goodwe",
         "growatt_server",
-        "nut",
+        "imeon_inverter",
         "powerwall",
-        "renault",
         "sma",
         "solaredge",
-        "tesla_fleet",
-        "teslemetry",
-        "tessie",
-        "volvo",
+        "solarlog",
+        "solax",
+        "victron_remote_monitoring",
     }
 )
 ROBOT_DOMAINS = frozenset({"lawn_mower", "vacuum"})
@@ -91,27 +92,45 @@ def normalize_battery_type(battery_type: str) -> str:
 
 type Rule = tuple[Callable[[DeviceTraits, str], bool], BatteryClass, str]
 
-# First match wins. Vehicles and home batteries also have charging sensors.
+# First match wins: vehicles, home batteries and robots also have charging sensors.
 RULES: tuple[Rule, ...] = (
     (
+        lambda traits, _: traits.integration in UPS_INTEGRATIONS,
+        BatteryClass.UPS,
+        "integration",
+    ),
+    (
+        lambda traits, _: (
+            traits.integration in VEHICLE_INTEGRATIONS
+            or (
+                traits.integration in TESLA_INTEGRATIONS
+                and "device_tracker" in traits.domains
+            )
+        ),
+        BatteryClass.VEHICLE,
+        "integration",
+    ),
+    (
+        lambda traits, _: (
+            traits.integration in HOME_BATTERY_INTEGRATIONS | TESLA_INTEGRATIONS
+        ),
+        BatteryClass.HOME_BATTERY,
+        "integration",
+    ),
+    (
         lambda traits, _: ("sensor", "energy_storage") in traits.device_classes,
-        BatteryClass.NOT_MAINTAINED,
+        BatteryClass.HOME_BATTERY,
         "energy_storage",
     ),
     (
-        lambda traits, _: traits.integration in NOT_MAINTAINED_INTEGRATIONS,
-        BatteryClass.NOT_MAINTAINED,
-        "integration",
+        lambda traits, _: bool(traits.domains & ROBOT_DOMAINS),
+        BatteryClass.ROBOT,
+        "robot",
     ),
     (
         lambda traits, _: traits.has_charging,
         BatteryClass.RECHARGEABLE,
         "charging_sensor",
-    ),
-    (
-        lambda traits, _: bool(traits.domains & ROBOT_DOMAINS),
-        BatteryClass.RECHARGEABLE,
-        "robot",
     ),
     (
         lambda traits, _: traits.integration == "mobile_app",
