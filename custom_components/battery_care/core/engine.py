@@ -21,7 +21,6 @@ REMINDER_FACTORS = {
     Importance.IMPORTANT: 0.5,
     Importance.CRITICAL: 0.25,
 }
-IMPORTANT = frozenset({Importance.IMPORTANT, Importance.CRITICAL})
 
 
 class Problem(StrEnum):
@@ -268,7 +267,6 @@ def _check_presence(
             Problem.NOT_RESPONDING,
             runtime.severity.value,
             notify=policy.unavailable_alerts,
-            urgent=policy.importance in IMPORTANT,
         )
     )
     return replace(runtime, unavailable_since=since, not_responding=True)
@@ -294,13 +292,7 @@ def _check_staleness(
             outcome.recovered.append(Problem.STALE)
         return replace(runtime, stale=False)
     if not runtime.stale:
-        outcome.alerts.append(
-            Alert(
-                Problem.STALE,
-                runtime.severity.value,
-                notify=policy.importance in IMPORTANT,
-            )
-        )
+        outcome.alerts.append(Alert(Problem.STALE, runtime.severity.value, notify=True))
     return replace(runtime, stale=True)
 
 

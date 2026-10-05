@@ -127,6 +127,15 @@
     "stop_ignoring": "Stop ignoring",
     "ignored_help": "Battery Care keeps showing this battery but never alerts about it."
   },
+  "snooze": {
+    "title": "Snooze notifications",
+    "days": {
+      "one": "{count} day",
+      "other": "{count} days"
+    },
+    "until": "No notification about this battery until {date}.",
+    "stop": "Notify again"
+  },
   "settings": {
     "loading": "Loading settings…",
     "load_failed": "The settings could not be loaded.",
@@ -140,6 +149,22 @@
     "alerts": "Alerts",
     "low": "Low at",
     "critical": "Critical at",
+    "notifications_title": "Notifications",
+    "notifications_help": "Critical batteries are notified at once; everything else comes in one daily summary.",
+    "persistent_notifications": "Show in Home Assistant notifications",
+    "phones": "Also notify these phones",
+    "no_phones": "No phone or tablet has the Home Assistant app.",
+    "phone_missing": "{name} (not found)",
+    "digest_minute": "Daily summary at",
+    "notify_recovered": "List batteries back to normal",
+    "quiet_hours": "Quiet hours",
+    "quiet_hours_help": "No notification during these hours, not even for a critical battery: it is sent when they end.",
+    "quiet_start_minute": "Quiet from",
+    "quiet_end_minute": "Quiet until",
+    "test": "Send a test notification",
+    "test_sent": "Test notification sent.",
+    "test_nowhere": "Nothing was sent: turn on Home Assistant notifications or choose a phone.",
+    "test_failed": "{name} could not be notified.",
     "general_title": "Alerts and reminders",
     "alerts_enabled": "Battery Care alerts",
     "reminder_hours": "Remind every",
@@ -159,6 +184,8 @@
       "out_of_range": "This value is outside the allowed range.",
       "critical_not_below_low": "The critical threshold must be below the low threshold.",
       "recovery_above_maximum": "The low threshold plus the recovery margin must not exceed 100%.",
+      "quiet_hours_empty": "Quiet hours must end at another time than they start.",
+      "invalid_targets": "These phones cannot be notified.",
       "other": "This change could not be saved."
     }
   }

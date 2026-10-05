@@ -2,13 +2,14 @@
 
 from collections.abc import Iterable
 from dataclasses import fields
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components import websocket_api
 from homeassistant.const import MAX_LENGTH_STATE_ENTITY_ID
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.event import async_call_later
+from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
 from .const import DOMAIN
@@ -25,8 +26,9 @@ ERR_INVALID_SETTING = "invalid_setting"
 # Keys are "d:", "e:" or "s:" followed by an id, at most an entity id.
 MAX_KEY_LENGTH = 2 + MAX_LENGTH_STATE_ENTITY_ID
 # Values are checked by the settings code; the schema only limits names and types.
-SETTING_VALUE = vol.Any(bool, int)
+SETTING_VALUE = vol.Any(bool, int, [str])
 KEY = vol.All(str, vol.Length(min=1, max=MAX_KEY_LENGTH))
+SNOOZE_DAYS = (0, 1, 3, 7)
 
 
 def _changes(keys: Iterable[str]) -> vol.Schema:
@@ -42,6 +44,8 @@ def async_register_commands(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, websocket_settings_get)
     websocket_api.async_register_command(hass, websocket_settings_update)
     websocket_api.async_register_command(hass, websocket_class_update)
+    websocket_api.async_register_command(hass, websocket_device_snooze)
+    websocket_api.async_register_command(hass, websocket_notify_test)
 
 
 def _loaded_manager(hass: HomeAssistant) -> BatteryCareManager | None:
@@ -287,3 +291,47 @@ def websocket_class_update(
         _send_invalid(connection, msg["id"], err)
         return
     connection.send_result(msg["id"], settings_view(manager))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "battery_care/device/snooze",
+        vol.Required("key"): KEY,
+        vol.Required("days"): vol.In(SNOOZE_DAYS),
+    }
+)
+@callback
+def websocket_device_snooze(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Hold the notifications of a battery for some days; 0 ends the snooze."""
+    if (manager := _loaded_manager(hass)) is None:
+        _send_not_loaded(connection, msg["id"])
+        return
+    if msg["key"] not in manager.inventory.devices:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_FOUND, "Unknown battery device"
+        )
+        return
+    days = msg["days"]
+    manager.async_snooze(
+        msg["key"], dt_util.utcnow() + timedelta(days=days) if days else None
+    )
+    connection.send_result(msg["id"], device_details(hass, manager, msg["key"]))
+
+
+@websocket_api.websocket_command({vol.Required("type"): "battery_care/notify/test"})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def websocket_notify_test(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Send a test notification to every chosen target, and report failures."""
+    if (manager := _loaded_manager(hass)) is None:
+        _send_not_loaded(connection, msg["id"])
+        return
+    connection.send_result(msg["id"], await manager.dispatcher.async_test())

@@ -3,8 +3,23 @@
     "step": {
       "user": {
         "title": "Configurer Battery Care ?",
-        "description": "Battery Care détectera automatiquement les appareils sur batterie connectés à Home Assistant."
+        "description": "Battery Care détectera automatiquement les appareils sur batterie connectés à Home Assistant. Une batterie critique est signalée tout de suite ; le reste arrive dans un récapitulatif quotidien. Vous pourrez tout modifier ensuite dans le panneau Battery Care.",
+        "data": {
+          "phones": "Prévenir aussi ces téléphones",
+          "digest_time": "Récapitulatif quotidien à",
+          "quiet_hours": "Heures calmes",
+          "quiet_start": "Calme à partir de",
+          "quiet_end": "Calme jusqu’à"
+        },
+        "data_description": {
+          "phones": "Téléphones et tablettes avec l’application Home Assistant. Les notifications apparaissent toujours dans Home Assistant.",
+          "digest_time": "Les batteries faibles, les appareils qui ne répondent plus et les batteries revenues à la normale sont listés une fois par jour.",
+          "quiet_hours": "Aucune notification pendant ces heures, même pour une batterie critique : elle est envoyée à leur fin."
+        }
       }
+    },
+    "error": {
+      "quiet_hours_empty": "Les heures calmes doivent se terminer à une autre heure que leur début."
     },
     "abort": {
       "single_instance_allowed": "Battery Care est déjà configuré."

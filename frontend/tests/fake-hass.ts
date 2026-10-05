@@ -154,6 +154,9 @@ export const LIMITS: Limits = {
   reminder_hours: [6, 720],
   unavailable_grace_hours: [1, 168],
   stale_days: [1, 90],
+  digest_minute: [0, 1439],
+  quiet_start_minute: [0, 1439],
+  quiet_end_minute: [0, 1439],
 };
 
 export function details(overrides: Partial<DeviceDetails> = {}): DeviceDetails {
@@ -182,6 +185,7 @@ export function details(overrides: Partial<DeviceDetails> = {}): DeviceDetails {
     chosen_importance: null,
     limits: LIMITS,
     stable: true,
+    snoozed_until: null,
     last_report: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
     sources: [
       {
@@ -219,8 +223,24 @@ export function settingsView(
       unavailable_grace_hours: 24,
       stale_detection: true,
       stale_days: 7,
+      persistent_notifications: true,
+      notify_targets: ["mobile_app_pixel", "mobile_app_old_phone"],
+      notify_recovered: true,
+      digest_minute: 18 * 60,
+      quiet_hours: true,
+      quiet_start_minute: 22 * 60,
+      quiet_end_minute: 8 * 60,
     },
     limits: LIMITS,
+    targets: [
+      { service: "mobile_app_ipad", name: "iPad", available: true },
+      { service: "mobile_app_pixel", name: "Pixel", available: true },
+      {
+        service: "mobile_app_old_phone",
+        name: "mobile_app_old_phone",
+        available: false,
+      },
+    ],
     classes: [
       {
         battery_class: "replaceable",

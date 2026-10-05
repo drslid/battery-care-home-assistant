@@ -183,8 +183,9 @@ def test_not_responding_after_the_grace_period() -> None:
     assert silent.runtime.not_responding
 
     important = make_policy(DEFAULTS, Importance.IMPORTANT)
-    urgent = evaluate(gone.runtime, seen(available=False), important, later)
-    assert urgent.alerts[0].urgent
+    digest = evaluate(gone.runtime, seen(available=False), important, later)
+    # Only critical batteries are urgent; this goes into the daily digest.
+    assert not digest.alerts[0].urgent
 
     muted = make_policy(Settings(unavailable_alerts=False), Importance.NORMAL)
     unannounced = evaluate(gone.runtime, seen(available=False), muted, later)
@@ -225,15 +226,11 @@ def test_a_silent_device_becomes_stale() -> None:
 
     week = NOW + timedelta(days=7)
     stale = evaluate(calm.runtime, seen(50), POLICY, week)
-    assert stale.alerts == (Alert(Problem.STALE, "normal", notify=False),)
+    assert stale.alerts == (Alert(Problem.STALE, "normal", notify=True),)
     assert stale.runtime.stale
     still = evaluate(stale.runtime, seen(50), POLICY, week + timedelta(days=1))
     assert still.runtime.stale
     assert still.alerts == ()
-
-    important = make_policy(DEFAULTS, Importance.CRITICAL)
-    told = evaluate(calm.runtime, seen(50), important, week)
-    assert told.alerts == (Alert(Problem.STALE, "normal", notify=True),)
 
     alive = evaluate(stale.runtime, seen(50, evidence_at=week), POLICY, week)
     assert not alive.runtime.stale

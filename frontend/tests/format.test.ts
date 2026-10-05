@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatBattery,
+  formatDate,
   formatLevel,
   formatRelative,
   intlLocale,
@@ -43,5 +44,12 @@ describe("formatters", () => {
     expect(formatRelative(at(18 * 24 * HOUR), "en", NOW)).toBe("18 days ago");
     expect(formatRelative(at(90 * 24 * HOUR), "en", NOW)).toBe("3 months ago");
     expect(formatRelative(at(800 * 24 * HOUR), "en", NOW)).toBe("2 years ago");
+  });
+
+  it("show a day and time in the user's language", () => {
+    const date = new Date(2026, 9, 8, 14, 30);
+    expect(formatDate(date, "fr")).toBe("jeu. 8 oct., 14:30");
+    // Recent ICU versions put a narrow no-break space before PM.
+    expect(formatDate(date, "en")).toMatch(/^Thu, Oct 8, 2:30\sPM$/);
   });
 });

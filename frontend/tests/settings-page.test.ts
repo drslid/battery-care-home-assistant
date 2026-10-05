@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { BatteryCareSettings, errorMessage } from "../src/settings-page";
+import type { TestResult } from "../src/api";
+import {
+  BatteryCareSettings,
+  clockMinute,
+  clockText,
+  errorMessage,
+} from "../src/settings-page";
 import type { HomeAssistant } from "../src/types";
 import { LIMITS, details, fakeHass, settingsView } from "./fake-hass";
 
@@ -139,6 +145,7 @@ describe("settings page", () => {
 
     expect(texts(page, "h2")).toEqual([
       "Alerts by battery type",
+      "Notifications",
       "Alerts and reminders",
       "Advanced",
       "Ignored batteries",
@@ -233,6 +240,136 @@ describe("settings page", () => {
     expect(inputs.length).toBeGreaterThan(0);
     expect(inputs.every((element) => element.disabled)).toBe(true);
     expect(root(page).querySelector(".ignored button")).toBeNull();
+    expect(root(page).querySelector(".test")).toBeNull();
+  });
+
+  it("lets an administrator choose the phones to notify", async () => {
+    const { page, callWS } = await mount();
+    const phones = () =>
+      [...root(page).querySelectorAll<HTMLInputElement>(".phones input")].map(
+        (element) => element.checked,
+      );
+
+    expect(texts(page, ".phones label")).toEqual([
+      "iPad",
+      "Pixel",
+      "mobile_app_old_phone (not found)",
+    ]);
+    expect(phones()).toEqual([false, true, true]);
+
+    change(input(page, "iPad"), true);
+    await settle(page);
+    change(input(page, "mobile_app_old_phone (not found)"), false);
+    await settle(page);
+
+    expect(
+      sent(callWS, "battery_care/settings/update").map(
+        ({ changes }) => changes,
+      ),
+    ).toEqual([
+      {
+        notify_targets: [
+          "mobile_app_pixel",
+          "mobile_app_old_phone",
+          "mobile_app_ipad",
+        ],
+      },
+      { notify_targets: ["mobile_app_pixel", "mobile_app_ipad"] },
+    ]);
+    expect(phones()).toEqual([true, true, false]);
+  });
+
+  it("says when no phone has the Home Assistant app", async () => {
+    const view = settingsView({ targets: [] });
+    const callWS = backend({ "battery_care/settings/get": () => view });
+    const { page } = await mount({ callWS });
+
+    expect(texts(page, ".phones p")).toEqual([
+      "No phone or tablet has the Home Assistant app.",
+    ]);
+  });
+
+  it("saves times as minutes after midnight", async () => {
+    const { page, callWS } = await mount();
+    const summary = input(page, "Daily summary at");
+    expect(summary.value).toBe("18:00");
+    expect(input(page, "Quiet from").value).toBe("22:00");
+
+    change(summary, "");
+    await settle(page);
+    expect(sent(callWS, "battery_care/settings/update")).toEqual([]);
+    expect(summary.value).toBe("18:00");
+
+    change(summary, "07:30");
+    change(input(page, "Quiet hours"), false);
+    await settle(page);
+
+    expect(
+      sent(callWS, "battery_care/settings/update").map(
+        ({ changes }) => changes,
+      ),
+    ).toEqual([{ digest_minute: 450 }, { quiet_hours: false }]);
+    expect(texts(page, "label.field span")).not.toContain("Quiet from");
+  });
+
+  it("sends a test notification and says what it reached", async () => {
+    let answer: (result: TestResult) => void = () => undefined;
+    const callWS = backend({
+      "battery_care/notify/test": () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    });
+    const { page } = await mount({ callWS });
+    const button = () =>
+      root(page).querySelector<HTMLButtonElement>(".test button");
+
+    button()?.click();
+    await settle(page);
+    expect(button()?.disabled).toBe(true);
+
+    answer({
+      persistent: true,
+      phones: [
+        { service: "mobile_app_pixel", name: "Pixel", error: null },
+        { service: "mobile_app_ipad", name: "iPad", error: "timeout" },
+      ],
+    });
+    await settle(page);
+
+    expect(button()?.disabled).toBe(false);
+    expect(texts(page, ".test [role=status]")).toEqual([
+      "Test notification sent.",
+    ]);
+    expect(texts(page, ".test [role=alert]")).toEqual([
+      "iPad could not be notified.",
+    ]);
+
+    button()?.click();
+    answer({ persistent: false, phones: [] });
+    await settle(page);
+
+    expect(texts(page, ".test [role=status]")).toEqual([
+      "Nothing was sent: turn on Home Assistant notifications or choose a phone.",
+    ]);
+    expect(texts(page, ".test [role=alert]")).toEqual([]);
+  });
+
+  it("explains a test notification that could not be sent", async () => {
+    const callWS = backend({
+      "battery_care/notify/test": () => Promise.reject(new Error("timeout")),
+    });
+    const { page } = await mount({ callWS });
+
+    root(page).querySelector<HTMLButtonElement>(".test button")?.click();
+    await settle(page);
+
+    expect(texts(page, "[role=alert]")).toEqual([
+      "This change could not be saved.",
+    ]);
+    expect(
+      root(page).querySelector<HTMLButtonElement>(".test button")?.disabled,
+    ).toBe(false);
   });
 
   it("stops ignoring a battery and keeps what was chosen for it", async () => {
@@ -291,8 +428,29 @@ describe("errorMessage", () => {
     expect(errorMessage(error("timeout"), "en")).toBe(
       "This change could not be saved.",
     );
+    expect(
+      errorMessage(error("quiet_end_minute: quiet_hours_empty"), "fr"),
+    ).toBe(
+      "Les heures calmes doivent se terminer à une autre heure que leur début.",
+    );
+    expect(errorMessage(error("notify_targets: invalid_targets"), "en")).toBe(
+      "These phones cannot be notified.",
+    );
     expect(errorMessage("not an error", "en")).toBe(
       "This change could not be saved.",
     );
+  });
+});
+
+describe("clock", () => {
+  it("turns minutes after midnight into HH:MM and back", () => {
+    expect(clockText(0)).toBe("00:00");
+    expect(clockText(450)).toBe("07:30");
+    expect(clockText(1439)).toBe("23:59");
+    expect(clockMinute("07:30")).toBe(450);
+    expect(clockMinute("23:59:30")).toBe(1439);
+    for (const text of ["", "7:30", "24:00", "12:60", "noon"]) {
+      expect(clockMinute(text)).toBeUndefined();
+    }
   });
 });

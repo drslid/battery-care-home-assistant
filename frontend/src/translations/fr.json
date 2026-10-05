@@ -127,6 +127,15 @@
     "stop_ignoring": "Ne plus ignorer",
     "ignored_help": "Battery Care continue d’afficher cette batterie mais n’envoie jamais d’alerte à son sujet."
   },
+  "snooze": {
+    "title": "Mettre les notifications en pause",
+    "days": {
+      "one": "{count} jour",
+      "other": "{count} jours"
+    },
+    "until": "Aucune notification pour cette batterie jusqu’au {date}.",
+    "stop": "Reprendre les notifications"
+  },
   "settings": {
     "loading": "Chargement des réglages…",
     "load_failed": "Impossible de charger les réglages.",
@@ -140,6 +149,22 @@
     "alerts": "Alertes",
     "low": "Faible à",
     "critical": "Critique à",
+    "notifications_title": "Notifications",
+    "notifications_help": "Une batterie critique est signalée tout de suite ; le reste arrive dans un récapitulatif quotidien.",
+    "persistent_notifications": "Afficher dans les notifications de Home Assistant",
+    "phones": "Prévenir aussi ces téléphones",
+    "no_phones": "Aucun téléphone ni aucune tablette n’a l’application Home Assistant.",
+    "phone_missing": "{name} (introuvable)",
+    "digest_minute": "Récapitulatif quotidien à",
+    "notify_recovered": "Lister les batteries revenues à la normale",
+    "quiet_hours": "Heures calmes",
+    "quiet_hours_help": "Aucune notification pendant ces heures, même pour une batterie critique : elle est envoyée à leur fin.",
+    "quiet_start_minute": "Calme à partir de",
+    "quiet_end_minute": "Calme jusqu’à",
+    "test": "Envoyer une notification de test",
+    "test_sent": "Notification de test envoyée.",
+    "test_nowhere": "Rien n’a été envoyé : activez les notifications de Home Assistant ou choisissez un téléphone.",
+    "test_failed": "Impossible de prévenir {name}.",
     "general_title": "Alertes et rappels",
     "alerts_enabled": "Alertes Battery Care",
     "reminder_hours": "Rappeler toutes les",
@@ -159,6 +184,8 @@
       "out_of_range": "Cette valeur est hors de la plage autorisée.",
       "critical_not_below_low": "Le seuil critique doit être inférieur au seuil faible.",
       "recovery_above_maximum": "Le seuil faible plus la marge de retour ne doit pas dépasser 100 %.",
+      "quiet_hours_empty": "Les heures calmes doivent se terminer à une autre heure que leur début.",
+      "invalid_targets": "Impossible de prévenir ces téléphones.",
       "other": "Impossible d’enregistrer cette modification."
     }
   }

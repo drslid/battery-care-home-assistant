@@ -3,8 +3,23 @@
     "step": {
       "user": {
         "title": "Set up Battery Care?",
-        "description": "Battery Care will automatically discover the battery-powered devices connected to Home Assistant."
+        "description": "Battery Care will automatically discover the battery-powered devices connected to Home Assistant. Critical batteries are notified at once; everything else comes in one daily summary. You can change all of this later in the Battery Care panel.",
+        "data": {
+          "phones": "Also notify these phones",
+          "digest_time": "Daily summary at",
+          "quiet_hours": "Quiet hours",
+          "quiet_start": "Quiet from",
+          "quiet_end": "Quiet until"
+        },
+        "data_description": {
+          "phones": "Phones and tablets with the Home Assistant app. Notifications always appear in Home Assistant.",
+          "digest_time": "Low batteries, devices that stopped responding and batteries back to normal are listed once a day.",
+          "quiet_hours": "No notification during these hours, not even for a critical battery: it is sent when they end."
+        }
       }
+    },
+    "error": {
+      "quiet_hours_empty": "Quiet hours must end at another time than they start."
     },
     "abort": {
       "single_instance_allowed": "Battery Care is already set up."

@@ -45,6 +45,12 @@ def test_valid_changes_are_applied() -> None:
             "recovery_above_maximum",
             "hysteresis",
         ),
+        ({"notify_targets": "mobile_app_pixel"}, "invalid_targets", "notify_targets"),
+        ({"notify_targets": ["Mobile App"]}, "invalid_targets", "notify_targets"),
+        ({"notify_targets": ["a", "a"]}, "invalid_targets", "notify_targets"),
+        ({"notify_targets": ["a"] * 51}, "invalid_targets", "notify_targets"),
+        ({"digest_minute": 1440}, "out_of_range", "digest_minute"),
+        ({"quiet_end_minute": 1320}, "quiet_hours_empty", "quiet_end_minute"),
     ],
 )
 def test_invalid_changes_are_refused(
@@ -70,6 +76,43 @@ def test_storage_round_trip() -> None:
     settings = Settings(low_threshold=30, critical_threshold=15, stale_detection=False)
 
     assert settings_from_storage(settings_to_storage(settings)) == (settings, [])
+
+
+def test_notification_settings() -> None:
+    """Phones are kept as a tuple; quiet hours may be equal while off."""
+    changed = updated(
+        DEFAULTS,
+        {
+            "notify_targets": ["mobile_app_pixel_8"],
+            "quiet_hours": False,
+            "quiet_end_minute": 1320,
+        },
+    )
+
+    assert changed.notify_targets == ("mobile_app_pixel_8",)
+    assert settings_to_storage(changed)["notify_targets"] == ("mobile_app_pixel_8",)
+    assert settings_from_storage(
+        {"notify_targets": ["mobile_app_pixel_8"], "digest_minute": 540}
+    ) == (
+        replace(DEFAULTS, notify_targets=("mobile_app_pixel_8",), digest_minute=540),
+        [],
+    )
+
+
+def test_empty_stored_quiet_hours_are_reset() -> None:
+    """Quiet hours that start and end together go back to their defaults."""
+    settings, problems = settings_from_storage(
+        {
+            "quiet_start_minute": 60,
+            "quiet_end_minute": 60,
+            "low_threshold": 15,
+            "critical_threshold": 30,
+        }
+    )
+
+    assert (settings.quiet_start_minute, settings.quiet_end_minute) == (1320, 480)
+    assert (settings.low_threshold, settings.critical_threshold) == (20, 10)
+    assert sorted(problems) == ["quiet_hours", "thresholds"]
 
 
 def test_invalid_stored_values_fall_back_to_defaults() -> None:

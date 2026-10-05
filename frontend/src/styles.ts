@@ -98,6 +98,7 @@ export const sharedStyles = css`
     gap: 6px;
   }
   input[type="number"],
+  input[type="time"],
   select {
     box-sizing: border-box;
     min-height: 40px;

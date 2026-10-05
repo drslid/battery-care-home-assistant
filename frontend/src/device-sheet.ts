@@ -17,7 +17,12 @@ import type {
   Settings,
   Source,
 } from "./api";
-import { formatBattery, formatLevel, formatRelative } from "./format";
+import {
+  formatBattery,
+  formatDate,
+  formatLevel,
+  formatRelative,
+} from "./format";
 import { localize, type Language } from "./i18n";
 import { errorMessage } from "./settings-page";
 import { icon, statusIcon, statusTone } from "./status";
@@ -41,6 +46,7 @@ const CLASSES: BatteryClass[] = [
   "unknown",
 ];
 const IMPORTANCES: Importance[] = ["low", "normal", "important", "critical"];
+const SNOOZE_DAYS = [1, 3, 7];
 
 /**
  * The read-only sheet of one battery device, opened by `?device=<key>`.
@@ -59,6 +65,7 @@ export class BatteryCareDeviceSheet extends LitElement {
     _details: { state: true },
     _failed: { state: true },
     _saveError: { state: true },
+    _snoozeError: { state: true },
   };
 
   declare hass: HomeAssistant | undefined;
@@ -70,6 +77,7 @@ export class BatteryCareDeviceSheet extends LitElement {
   declare _details: DeviceDetails | undefined;
   declare _failed: boolean;
   declare _saveError: string | undefined;
+  declare _snoozeError: string | undefined;
 
   private request = 0;
 
@@ -87,6 +95,7 @@ export class BatteryCareDeviceSheet extends LitElement {
       this._details = undefined;
       this._failed = false;
       this._saveError = undefined;
+      this._snoozeError = undefined;
     }
     if (
       (changed.has("deviceKey") || changed.has("device")) &&
@@ -217,9 +226,70 @@ export class BatteryCareDeviceSheet extends LitElement {
             </p>`
           : nothing
       }
+      ${details ? this.renderSnooze(details) : nothing}
       ${details && this.admin ? this.renderCustomize(details) : nothing}
       ${details ? this.renderSources(details) : nothing}
     `;
+  }
+
+  private async snooze(details: DeviceDetails, days: number): Promise<void> {
+    this._snoozeError = undefined;
+    try {
+      const saved = await this.hass?.callWS<DeviceDetails>({
+        type: "battery_care/device/snooze",
+        key: details.device.key,
+        days,
+      });
+      if (saved !== undefined) {
+        this._details = saved;
+      }
+    } catch (error) {
+      this._snoozeError = errorMessage(error, this.language);
+    }
+  }
+
+  /** Notifications can wait a few days, for a battery that needs attention. */
+  private renderSnooze(
+    details: DeviceDetails,
+  ): TemplateResult | typeof nothing {
+    const { language } = this;
+    const until = details.snoozed_until;
+    if (until === null && !details.device.attention) {
+      return nothing;
+    }
+    return html`<section class="snooze">
+      <h3>${localize(language, "snooze.title")}</h3>
+      ${
+        until === null
+          ? html`<div class="snooze-actions">
+              ${SNOOZE_DAYS.map(
+                (days) =>
+                  html`<button
+                    class="text-button"
+                    @click=${() => void this.snooze(details, days)}
+                  >
+                    ${localize(language, "snooze.days", { count: days })}
+                  </button>`,
+              )}
+            </div>`
+          : html`<p class="secondary">
+                ${localize(language, "snooze.until", {
+                  date: formatDate(new Date(until), this.locale),
+                })}
+              </p>
+              <button
+                class="text-button"
+                @click=${() => void this.snooze(details, 0)}
+              >
+                ${localize(language, "snooze.stop")}
+              </button>`
+      }
+      ${
+        this._snoozeError
+          ? html`<p class="message error" role="alert">${this._snoozeError}</p>`
+          : nothing
+      }
+    </section>`;
   }
 
   private get admin(): boolean {
@@ -593,7 +663,8 @@ export class BatteryCareDeviceSheet extends LitElement {
       .message {
         margin: 16px 0;
       }
-      .customize {
+      .customize,
+      .snooze {
         display: flex;
         flex-direction: column;
         align-items: stretch;
@@ -602,7 +673,23 @@ export class BatteryCareDeviceSheet extends LitElement {
         border-top: 1px solid var(--bc-divider);
         border-bottom: 1px solid var(--bc-divider);
       }
-      .customize h3 {
+      .snooze {
+        align-items: flex-start;
+      }
+      .snooze + .customize {
+        margin-top: 0;
+        border-top: 0;
+      }
+      .snooze p {
+        margin: 0 0 8px;
+      }
+      .snooze-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .customize h3,
+      .snooze h3 {
         margin: 8px 0;
         font-size: 16px;
         font-weight: 500;

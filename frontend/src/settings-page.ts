@@ -6,6 +6,7 @@ import type {
   Limits,
   Settings,
   SettingsView,
+  TestResult,
 } from "./api";
 import { localize, type Language } from "./i18n";
 import { sharedStyles } from "./styles";
@@ -17,7 +18,26 @@ const KNOWN_ERRORS = new Set([
   "out_of_range",
   "critical_not_below_low",
   "recovery_above_maximum",
+  "quiet_hours_empty",
+  "invalid_targets",
 ]);
+
+/** "HH:MM" for a number of minutes after midnight. */
+export function clockText(minute: number): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}`;
+}
+
+/** Minutes after midnight for "HH:MM", or undefined. */
+export function clockMinute(text: string): number | undefined {
+  const match = /^(\d{2}):(\d{2})/.exec(text);
+  if (match === null) {
+    return undefined;
+  }
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  return hours < 24 && minutes < 60 ? hours * 60 + minutes : undefined;
+}
 
 /** Turn a refused change ("key: code") into a sentence for the user. */
 export function errorMessage(
@@ -56,6 +76,7 @@ export class BatteryCareSettings extends LitElement {
     _view: { state: true },
     _failed: { state: true },
     _error: { state: true },
+    _test: { state: true },
   };
 
   declare hass: HomeAssistant | undefined;
@@ -66,6 +87,8 @@ export class BatteryCareSettings extends LitElement {
   declare _view: SettingsView | undefined;
   declare _failed: boolean;
   declare _error: string | undefined;
+  /** What the last test notification reached, or "sending". */
+  declare _test: TestResult | "sending" | undefined;
 
   constructor() {
     super();
@@ -130,6 +153,18 @@ export class BatteryCareSettings extends LitElement {
     });
   }
 
+  private async sendTest(): Promise<void> {
+    this._test = "sending";
+    try {
+      this._test = await this.hass?.callWS<TestResult>({
+        type: "battery_care/notify/test",
+      });
+    } catch (error) {
+      this._test = undefined;
+      this._error = errorMessage(error, this.language);
+    }
+  }
+
   private async stopIgnoring(key: string): Promise<void> {
     this._error = undefined;
     try {
@@ -172,9 +207,137 @@ export class BatteryCareSettings extends LitElement {
           ? html`<p class="message error" role="alert">${this._error}</p>`
           : nothing
       }
-      ${this.renderClasses(view)} ${this.renderGeneral(view)}
-      ${this.renderIgnored(view)}
+      ${this.renderClasses(view)} ${this.renderNotifications(view)}
+      ${this.renderGeneral(view)} ${this.renderIgnored(view)}
     `;
+  }
+
+  private renderNotifications(view: SettingsView): TemplateResult {
+    const { language } = this;
+    const { settings } = view;
+    const chosen = new Set(settings.notify_targets);
+    const time = (
+      key: "digest_minute" | "quiet_start_minute" | "quiet_end_minute",
+    ) =>
+      html`<label class="field">
+        <span>${localize(language, `settings.${key}`)}</span>
+        <input
+          type="time"
+          .value=${live(clockText(settings[key]))}
+          ?disabled=${!this.admin}
+          @change=${(event: Event) => {
+            const input = event.target as HTMLInputElement;
+            const minute = clockMinute(input.value);
+            if (minute === undefined) {
+              input.value = clockText(settings[key]);
+              return;
+            }
+            this.updateSettings({ [key]: minute });
+          }}
+        />
+      </label>`;
+    return html`<section class="card">
+      <h2>${localize(language, "settings.notifications_title")}</h2>
+      <p class="help secondary">
+        ${localize(language, "settings.notifications_help")}
+      </p>
+      <div class="fields">
+        ${this.toggle(
+          localize(language, "settings.persistent_notifications"),
+          settings.persistent_notifications,
+          (checked) => {
+            this.updateSettings({ persistent_notifications: checked });
+          },
+        )}
+        <fieldset class="phones">
+          <legend>${localize(language, "settings.phones")}</legend>
+          ${
+            view.targets.length
+              ? view.targets.map((target) =>
+                  this.toggle(
+                    target.available
+                      ? target.name
+                      : localize(language, "settings.phone_missing", {
+                          name: target.name,
+                        }),
+                    chosen.has(target.service),
+                    (checked) => {
+                      this.updateSettings({
+                        notify_targets: checked
+                          ? [...settings.notify_targets, target.service]
+                          : settings.notify_targets.filter(
+                              (service) => service !== target.service,
+                            ),
+                      });
+                    },
+                  ),
+                )
+              : html`<p class="help secondary">
+                  ${localize(language, "settings.no_phones")}
+                </p>`
+          }
+        </fieldset>
+        ${time("digest_minute")}
+        ${this.toggle(
+          localize(language, "settings.notify_recovered"),
+          settings.notify_recovered,
+          (checked) => {
+            this.updateSettings({ notify_recovered: checked });
+          },
+        )}
+        ${this.toggle(
+          localize(language, "settings.quiet_hours"),
+          settings.quiet_hours,
+          (checked) => {
+            this.updateSettings({ quiet_hours: checked });
+          },
+        )}
+        ${
+          settings.quiet_hours
+            ? html`<p class="help secondary">
+                  ${localize(language, "settings.quiet_hours_help")}
+                </p>
+                ${time("quiet_start_minute")} ${time("quiet_end_minute")}`
+            : nothing
+        }
+      </div>
+      ${this.admin ? this.renderTest() : nothing}
+    </section>`;
+  }
+
+  private renderTest(): TemplateResult {
+    const { language } = this;
+    const test = this._test;
+    const failed =
+      test === undefined || test === "sending"
+        ? []
+        : test.phones.filter((phone) => phone.error !== null);
+    return html`<div class="test">
+      <button
+        class="text-button"
+        ?disabled=${test === "sending"}
+        @click=${() => void this.sendTest()}
+      >
+        ${localize(language, "settings.test")}
+      </button>
+      ${
+        test === undefined || test === "sending"
+          ? nothing
+          : html`<p class="help secondary" role="status">
+              ${
+                test.persistent || test.phones.length > failed.length
+                  ? localize(language, "settings.test_sent")
+                  : localize(language, "settings.test_nowhere")
+              }
+            </p>`
+      }
+      ${failed.map(
+        (phone) =>
+          html`<p class="message error" role="alert">
+            ${localize(language, "settings.test_failed", { name: phone.name })}
+          </p>`,
+      )}
+    </div>`;
   }
 
   private renderClasses(view: SettingsView): TemplateResult {
@@ -398,6 +561,25 @@ export class BatteryCareSettings extends LitElement {
       }
       .ignored a {
         color: inherit;
+      }
+      .phones {
+        margin: 0;
+        padding: 0;
+        border: none;
+      }
+      .phones legend {
+        padding: 8px 16px 0;
+        color: var(--bc-secondary);
+      }
+      .test {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 0 16px 16px;
+      }
+      .test .help {
+        padding: 0;
       }
       @container (min-width: 600px) {
         .class-row {

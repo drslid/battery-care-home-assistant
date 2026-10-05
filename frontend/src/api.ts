@@ -106,6 +106,7 @@ export interface DeviceDetails {
   limits: Limits;
   stable: boolean;
   last_report: string | null;
+  snoozed_until: string | null;
   sources: Source[];
 }
 
@@ -123,6 +124,14 @@ export interface Settings {
   unavailable_grace_hours: number;
   stale_detection: boolean;
   stale_days: number;
+  persistent_notifications: boolean;
+  notify_targets: string[];
+  notify_recovered: boolean;
+  /** Minutes after midnight, local time. */
+  digest_minute: number;
+  quiet_hours: boolean;
+  quiet_start_minute: number;
+  quiet_end_minute: number;
 }
 
 export interface ClassRow {
@@ -141,8 +150,21 @@ export interface SettingsView {
   api: number;
   settings: Settings;
   limits: Limits;
+  /** Phones with the Home Assistant app; chosen ones that are gone too. */
+  targets: Target[];
   classes: ClassRow[];
   ignored: { key: string; name: string }[];
+}
+
+export interface Target {
+  service: string;
+  name: string;
+  available: boolean;
+}
+
+export interface TestResult {
+  persistent: boolean;
+  phones: { service: string; name: string; error: string | null }[];
 }
 
 /** Waiting, receiving, Battery Care not running, or this page is out of date. */

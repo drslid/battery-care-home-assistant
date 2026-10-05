@@ -8,7 +8,9 @@ from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import area_registry as ar
 from homeassistant.loader import IntegrationNotLoaded, async_get_loaded_integration
+from homeassistant.util import dt as dt_util
 
+from .adapters.notify import phone_targets
 from .adapters.registry import source_value
 from .core.models import BatteryClass, BatterySource, Importance
 from .core.policy import (
@@ -144,10 +146,17 @@ def device_details(
         "limits": _limits(),
         "stable": device.stable,
         "last_report": max(reported).isoformat() if reported else None,
+        "snoozed_until": _snoozed_until(manager, key),
         "sources": [
             _source(source, states[source.entity_id]) for source in device.sources
         ],
     }
+
+
+def _snoozed_until(manager: BatteryCareManager, key: str) -> str | None:
+    runtime = manager.state.devices.get(key)
+    until = runtime.snoozed_until if runtime else None
+    return until.isoformat() if until and until > dt_util.utcnow() else None
 
 
 def _source(source: BatterySource, state: State | None) -> dict[str, Any]:
@@ -173,10 +182,22 @@ def settings_view(manager: BatteryCareManager) -> dict[str, Any]:
         counts[battery_class(device, config)] += 1
         if config.mode is DeviceMode.IGNORED:
             ignored.append({"key": key, "name": device.name})
+    targets = [
+        {"service": target.service, "name": target.name, "available": True}
+        for target in phone_targets(manager.hass)
+    ]
+    found = {target["service"] for target in targets}
+    # Chosen phones that are gone stay listed, so that they can be removed.
+    targets += [
+        {"service": service, "name": service, "available": False}
+        for service in manager.settings.notify_targets
+        if service not in found
+    ]
     return {
         "api": API_VERSION,
         "settings": asdict(manager.settings),
         "limits": _limits(),
+        "targets": targets,
         "classes": [
             {
                 "battery_class": chosen.value,

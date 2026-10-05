@@ -30,7 +30,7 @@ CONFIG_KEY = f"{DOMAIN}.config"
 CONFIG_MINOR_VERSION = 1
 STATE_KEY = f"{DOMAIN}.state"
 # 1.2 adds the runtime state of each device and the first-run flag.
-STATE_MINOR_VERSION = 2
+STATE_MINOR_VERSION = 3
 CONFIG_SAVE_DELAY = 1
 STATE_SAVE_DELAY = 15
 
@@ -62,6 +62,10 @@ class StateData:
     devices: dict[str, Runtime] = field(default_factory=dict)
     # The first run takes every state silently, then sends one summary.
     baseline_done: bool = False
+    # Batteries to tell about in the next daily digest.
+    digest: list[str] = field(default_factory=list)
+    # Critical batteries to tell about when quiet hours end.
+    held: list[str] = field(default_factory=list)
 
 
 def config_from_raw(raw: object) -> tuple[ConfigData, list[str]]:
@@ -126,7 +130,16 @@ def state_from_raw(raw: object) -> tuple[StateData, list[str]]:
     if not isinstance(baseline_done, bool):
         problems.append("baseline_done")
         baseline_done = False
-    return StateData(known, devices, baseline_done), problems
+    queues: dict[str, list[str]] = {}
+    for name in ("digest", "held"):
+        queue = raw.get(name) or []
+        if not isinstance(queue, list) or not all(
+            isinstance(key, str) for key in queue
+        ):
+            problems.append(name)
+            queue = []
+        queues[name] = list(dict.fromkeys(queue))
+    return StateData(known, devices, baseline_done, **queues), problems
 
 
 def state_to_raw(state: StateData) -> dict[str, Any]:
@@ -137,6 +150,8 @@ def state_to_raw(state: StateData) -> dict[str, Any]:
             key: runtime_to_storage(runtime) for key, runtime in state.devices.items()
         },
         "baseline_done": state.baseline_done,
+        "digest": list(state.digest),
+        "held": list(state.held),
     }
 
 

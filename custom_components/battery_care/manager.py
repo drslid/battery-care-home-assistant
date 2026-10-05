@@ -1,6 +1,7 @@
 """Coordinate discovery, tracking, the alert engine and storage for the entry."""
 
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import datetime, timedelta
 from functools import partial
 import logging
@@ -23,6 +24,7 @@ from .const import DOMAIN
 from .core.engine import Alert, Evaluation, Observation, evaluate, make_policy
 from .core.health import health_score
 from .core.known import track
+from .core.messages import Line
 from .core.models import BatteryClass, BatteryDevice, Importance, Inventory
 from .core.policy import (
     AUTOMATIC,
@@ -37,7 +39,8 @@ from .core.policy import (
 from .core.readings import Reading, read
 from .core.runtime import Runtime
 from .core.settings import Settings, SettingsError, updated
-from .core.status import Status, Summary, device_status, summarize
+from .core.status import ATTENTION, Status, Summary, device_status, summarize
+from .dispatcher import Dispatcher
 from .storage import (
     CONFIG_KEY,
     CONFIG_MINOR_VERSION,
@@ -65,6 +68,14 @@ EVENT_RECOVERED = f"{DOMAIN}_recovered"
 EVENT_VERSION = 1
 NOT_REPORTS = frozenset({STATE_UNAVAILABLE, STATE_UNKNOWN})
 NEW = Runtime()
+# What notifications say about each status; others are not told.
+TOLD = {
+    Status.CRITICAL: "critical",
+    Status.LOW: "low",
+    Status.NOT_RESPONDING: "not_responding",
+    Status.STALE: "stale",
+    Status.OK: "recovered",
+}
 
 type BatteryCareConfigEntry = ConfigEntry[BatteryCareManager]
 
@@ -113,12 +124,22 @@ class BatteryCareManager:
         )
         self._config_dirty = False
         self._state_dirty = False
-
-    async def async_load(self) -> None:
-        """Load the stored data; invalid values are ignored with a warning."""
-        self.config, config_problems = config_from_raw(
-            await self._config_store.async_load()
+        self.dispatcher = Dispatcher(
+            hass,
+            state=lambda: self.state,
+            settings=lambda: self.config.settings,
+            describe=self._describe,
+            save=self._async_save_state,
         )
+
+    async def async_load(self, initial: Mapping[str, Any] | None = None) -> None:
+        """Load the stored data; invalid values are ignored with a warning.
+
+        Args:
+            initial: settings chosen at setup, used until the first save.
+        """
+        raw_config = await self._config_store.async_load()
+        self.config, config_problems = config_from_raw(raw_config)
         self.state, state_problems = state_from_raw(
             await self._state_store.async_load()
         )
@@ -127,6 +148,13 @@ class BatteryCareManager:
                 "Ignored invalid stored values, using defaults instead: %s",
                 ", ".join(problems),
             )
+        if raw_config is None and initial:
+            try:
+                self.config.settings = updated(self.config.settings, initial)
+            except SettingsError as err:
+                _LOGGER.warning("Ignored the settings chosen at setup: %s", err)
+            else:
+                self._async_save_config()
 
     @callback
     def async_start(self) -> None:
@@ -146,6 +174,7 @@ class BatteryCareManager:
             self._cancel_wake()
             self._cancel_wake = None
         self._wake_time = None
+        self.dispatcher.async_stop()
         self._tracker.async_stop()
         subscribers, self._subscribers = self._subscribers, set()
         for subscriber in subscribers:
@@ -199,7 +228,19 @@ class BatteryCareManager:
         self.config.settings = updated(self.config.settings, changes)
         self._async_save_config()
         self._async_evaluate_all(everything=True)
+        if self.ready:
+            self.dispatcher.async_settings_changed()
         return self.config.settings
+
+    @callback
+    def async_snooze(self, key: str, until: datetime | None) -> None:
+        """Hold the notifications of a device until a time, or stop holding them."""
+        runtime = self.state.devices.get(key, NEW)
+        self.state.devices[key] = replace(runtime, snoozed_until=until)
+        self._async_save_state()
+        self._async_evaluate(key, dt_util.utcnow())
+        self._async_schedule_wake()
+        self._async_changed(frozenset({key}))
 
     @callback
     def async_configure_device(
@@ -309,14 +350,17 @@ class BatteryCareManager:
             )
         self._async_rebuild()
         self._tracker.async_start()
+        self.dispatcher.async_start()
 
     @callback
     def _async_finish_baseline(self, _now: datetime) -> None:
-        """End the silent first run, which lasts as long as the startup window."""
+        """End the silent first run, then sum up what needs attention."""
         self.state.baseline_done = True
         self._async_save_state()
-        _LOGGER.debug(
-            "First run finished: %d batteries need attention", self.summary.attention
+        self.dispatcher.async_summary(
+            key
+            for key, (status, alerts, _) in self._rows.items()
+            if alerts and status in ATTENTION
         )
 
     @callback
@@ -420,21 +464,20 @@ class BatteryCareManager:
             self._wake_at.pop(key, None)
         else:
             self._wake_at[key] = result.wake_at
+        changed = result.runtime != previous
+        if changed:
+            self.state.devices[key] = result.runtime
+            self._async_save_state()
+        # Notifications describe the new state, so it is stored first.
         self._async_announce(key, result)
-        if result.runtime == previous:
-            return False
-        self.state.devices[key] = result.runtime
-        self._async_save_state()
-        return True
+        return changed
 
     @callback
     def _async_announce(self, key: str, result: Evaluation) -> None:
-        """Fire the events of an evaluation."""
+        """Fire the events of an evaluation, and pass it on to be notified."""
         level = result.runtime.last_level
         for alert in result.alerts:
             self.hass.bus.async_fire(EVENT_ALERT, self._alert_data(key, alert, level))
-            if alert.notify:
-                _LOGGER.debug("Notification for %s: %s", key, alert)
         for problem in result.recovered:
             self.hass.bus.async_fire(
                 EVENT_RECOVERED,
@@ -446,17 +489,49 @@ class BatteryCareManager:
                     "level": level,
                 },
             )
+        if result.alerts or result.recovered:
+            self.dispatcher.async_handle(key, result.alerts, result.recovered)
+
+    def _describe(self, key: str) -> Line | None:
+        """Describe a battery for a notification; None when it must not be told."""
+        if (device := self.inventory.devices.get(key)) is None:
+            return None
+        runtime = self.state.devices.get(key, NEW)
+        if (
+            runtime.snoozed_until is not None
+            and runtime.snoozed_until > dt_util.utcnow()
+        ):
+            return None
+        if not self.effective_settings(key).alerts_enabled:
+            return None
+        if (told := TOLD.get(self.status(key))) is None:
+            return None
+        level = self.readings[key].level
+        metadata = device.metadata
+        battery = None
+        if metadata is not None:
+            battery = metadata.battery_type
+            if metadata.quantity > 1:
+                battery = f"{metadata.quantity} \N{MULTIPLICATION SIGN} {battery}"
+        return Line(
+            name=device.name,
+            status=told,
+            level=runtime.last_level if level is None else level,
+            area=self._area_name(device),
+            battery=battery,
+        )
+
+    def _area_name(self, device: BatteryDevice) -> str | None:
+        if device.area_id is None:
+            return None
+        area = ar.async_get(self.hass).async_get_area(device.area_id)
+        return area.name if area else None
 
     def _alert_data(
         self, key: str, alert: Alert, level: float | None
     ) -> dict[str, Any]:
         device = self.inventory.devices[key]
         metadata = device.metadata
-        area = (
-            ar.async_get(self.hass).async_get_area(device.area_id)
-            if device.area_id
-            else None
-        )
         return {
             "version": EVENT_VERSION,
             "device_key": key,
@@ -464,7 +539,7 @@ class BatteryCareManager:
             # Charging sources sort last, and every device has another source.
             "entity_id": device.sources[0].entity_id,
             "name": device.name,
-            "area": area.name if area else None,
+            "area": self._area_name(device),
             "severity": alert.problem.value,
             "previous_severity": alert.previous,
             "level": level,

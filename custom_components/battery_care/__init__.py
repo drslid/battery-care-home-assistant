@@ -28,7 +28,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BatteryCareConfigEntry) 
     """Set up Battery Care from its config entry."""
     manager = BatteryCareManager(hass)
     try:
-        await manager.async_load()
+        await manager.async_load(entry.data.get("settings"))
     except UnsupportedStorageVersionError as err:
         raise ConfigEntryError(
             translation_domain=DOMAIN, translation_key="storage_too_new"

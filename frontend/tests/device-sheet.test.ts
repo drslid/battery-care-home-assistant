@@ -8,6 +8,7 @@ import type {
   Settings,
 } from "../src/api";
 import { BatteryCareDeviceSheet } from "../src/device-sheet";
+import { formatDate } from "../src/format";
 import type { HomeAssistant } from "../src/types";
 import { details, device, fakeHass } from "./fake-hass";
 
@@ -434,5 +435,84 @@ describe("customizing a battery", () => {
       "Choose a value between 1 and 95.",
     ]);
     expect(saved).not.toHaveBeenCalled();
+  });
+});
+
+describe("snoozing notifications", () => {
+  const UNTIL = "2026-10-09T12:30:00+00:00";
+
+  /** Answer snoozes as the backend does, for a user who is not an admin. */
+  async function mountSnooze(refuse = false) {
+    const callWS = vi.fn((message: Message) => {
+      if (message.type !== "battery_care/device/snooze") {
+        return Promise.resolve(details());
+      }
+      if (refuse) {
+        return Promise.reject(new Error("not_found"));
+      }
+      return Promise.resolve(
+        details({ snoozed_until: message.days === 0 ? null : UNTIL }),
+      );
+    });
+    const sheet = await mount({
+      hass: fakeHass({ callWS: callWS as HomeAssistant["callWS"] }),
+    });
+    return { sheet, callWS };
+  }
+
+  async function click(sheet: BatteryCareDeviceSheet, text: string) {
+    [
+      ...(sheet.shadowRoot?.querySelectorAll<HTMLButtonElement>(
+        ".snooze button",
+      ) ?? []),
+    ]
+      .find((element) => element.textContent.trim() === text)
+      ?.click();
+    await flush();
+    await sheet.updateComplete;
+  }
+
+  it("lets any user pause the notifications of a battery that needs attention", async () => {
+    const { sheet, callWS } = await mountSnooze();
+
+    expect(texts(sheet, ".snooze h3")).toEqual(["Snooze notifications"]);
+    expect(texts(sheet, ".snooze button")).toEqual([
+      "1 day",
+      "3 days",
+      "7 days",
+    ]);
+
+    await click(sheet, "3 days");
+    expect(texts(sheet, ".snooze p")).toEqual([
+      `No notification about this battery until ${formatDate(new Date(UNTIL), "en")}.`,
+    ]);
+
+    await click(sheet, "Notify again");
+    expect(texts(sheet, ".snooze button")).toHaveLength(3);
+    expect(
+      callWS.mock.calls
+        .map(([message]) => message)
+        .filter((message) => message.type === "battery_care/device/snooze"),
+    ).toEqual([
+      { type: "battery_care/device/snooze", key: "d:door", days: 3 },
+      { type: "battery_care/device/snooze", key: "d:door", days: 0 },
+    ]);
+  });
+
+  it("is not offered for a battery that is fine", async () => {
+    const sheet = await mount({
+      hass: hassWith({ device: device({ attention: false }) }),
+    });
+    expect(sheet.shadowRoot?.querySelector(".snooze")).toBeNull();
+  });
+
+  it("explains a snooze that could not be saved", async () => {
+    const { sheet } = await mountSnooze(true);
+
+    await click(sheet, "1 day");
+
+    expect(texts(sheet, ".snooze [role=alert]")).toEqual([
+      "This change could not be saved.",
+    ]);
   });
 });

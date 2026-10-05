@@ -12,13 +12,12 @@ export function intlLocale(tag: string | undefined): string {
 // Building formatters is slow next to using them; long lists reuse them.
 const formatters = new Map<
   string,
-  Intl.NumberFormat | Intl.RelativeTimeFormat
+  Intl.NumberFormat | Intl.RelativeTimeFormat | Intl.DateTimeFormat
 >();
 
-function cached<T extends Intl.NumberFormat | Intl.RelativeTimeFormat>(
-  key: string,
-  create: () => T,
-): T {
+function cached<
+  T extends Intl.NumberFormat | Intl.RelativeTimeFormat | Intl.DateTimeFormat,
+>(key: string, create: () => T): T {
   let formatter = formatters.get(key);
   if (formatter === undefined) {
     formatter = create();
@@ -49,6 +48,21 @@ export function formatBattery(battery: Battery, locale: string): string {
     () => new Intl.NumberFormat(locale),
   ).format(battery.quantity);
   return `${quantity} × ${battery.type}`;
+}
+
+/** Format a day and time, such as "Thu, Oct 8, 2:30 PM". */
+export function formatDate(date: Date, locale: string): string {
+  return cached(
+    `date:${locale}`,
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+  ).format(date);
 }
 
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
