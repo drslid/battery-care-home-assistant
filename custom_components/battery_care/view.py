@@ -10,8 +10,16 @@ from homeassistant.helpers import area_registry as ar
 from homeassistant.loader import IntegrationNotLoaded, async_get_loaded_integration
 
 from .adapters.registry import source_value
-from .core.models import BatterySource, Importance
-from .core.policy import battery_class, importance
+from .core.models import BatteryClass, BatterySource, Importance
+from .core.policy import (
+    CLASS_KEYS,
+    OVERRIDABLE,
+    DeviceMode,
+    battery_class,
+    class_settings,
+    importance,
+)
+from .core.settings import LIMITS, Settings
 from .core.status import needs_attention
 from .manager import BatteryCareManager
 
@@ -119,6 +127,20 @@ def device_details(
         "alerts": settings.alerts_enabled,
         "low_threshold": settings.low_threshold,
         "critical_threshold": settings.critical_threshold,
+        "overrides": dict(config.overrides),
+        # What the device follows when it has no override: its class settings.
+        "inherited": _pick(
+            class_settings(
+                manager.settings,
+                battery_class(device, config),
+                manager.config.classes,
+            ),
+            OVERRIDABLE,
+        ),
+        "detected_class": device.battery_class.value,
+        "chosen_class": config.battery_class.value if config.battery_class else None,
+        "suggested_importance": device.suggested_importance.value,
+        "chosen_importance": config.importance.value if config.importance else None,
         "stable": device.stable,
         "last_report": max(reported).isoformat() if reported else None,
         "sources": [
@@ -135,3 +157,36 @@ def _source(source: BatterySource, state: State | None) -> dict[str, Any]:
         "name": state.name if state else source.entity_id,
         "state": source_value(state, source),
     }
+
+
+def settings_view(manager: BatteryCareManager) -> dict[str, Any]:
+    """Return what the Settings page shows and edits."""
+    counts = dict.fromkeys(BatteryClass, 0)
+    ignored: list[dict[str, str]] = []
+    for key, device in manager.inventory.devices.items():
+        config = manager.device_config(key)
+        counts[battery_class(device, config)] += 1
+        if config.mode is DeviceMode.IGNORED:
+            ignored.append({"key": key, "name": device.name})
+    return {
+        "api": API_VERSION,
+        "settings": asdict(manager.settings),
+        "limits": {key: list(limit) for key, limit in LIMITS.items()},
+        "classes": [
+            {
+                "battery_class": chosen.value,
+                "devices": counts[chosen],
+                "custom": chosen in manager.config.classes,
+                **_pick(
+                    class_settings(manager.settings, chosen, manager.config.classes),
+                    CLASS_KEYS,
+                ),
+            }
+            for chosen in BatteryClass
+        ],
+        "ignored": sorted(ignored, key=lambda item: item["name"].casefold()),
+    }
+
+
+def _pick(settings: Settings, keys: Iterable[str]) -> dict[str, Any]:
+    return {key: getattr(settings, key) for key in sorted(keys)}

@@ -1,5 +1,7 @@
 """WebSocket commands for the Battery Care panel."""
 
+from collections.abc import Iterable
+from dataclasses import fields
 from datetime import datetime
 from typing import Any
 
@@ -10,14 +12,25 @@ from homeassistant.helpers.event import async_call_later
 import voluptuous as vol
 
 from .const import DOMAIN
+from .core.models import BatteryClass, Importance
+from .core.policy import CLASS_KEYS, OVERRIDABLE, DeviceMode
+from .core.settings import Settings, SettingsError
 from .manager import BatteryCareConfigEntry, BatteryCareManager
-from .view import API_VERSION, device_details, patch, snapshot
+from .view import API_VERSION, device_details, patch, settings_view, snapshot
 
 # At most four messages per second for each open panel.
 PATCH_INTERVAL = 0.25
 ERR_NOT_LOADED = "not_loaded"
+ERR_INVALID_SETTING = "invalid_setting"
 # Keys are "d:", "e:" or "s:" followed by an id, at most an entity id.
 MAX_KEY_LENGTH = 2 + MAX_LENGTH_STATE_ENTITY_ID
+# Values are checked by the settings code; the schema only limits names and types.
+SETTING_VALUE = vol.Any(bool, int)
+KEY = vol.All(str, vol.Length(min=1, max=MAX_KEY_LENGTH))
+
+
+def _changes(keys: Iterable[str]) -> vol.Schema:
+    return vol.Schema({vol.Optional(key): SETTING_VALUE for key in sorted(keys)})
 
 
 @callback
@@ -25,6 +38,10 @@ def async_register_commands(hass: HomeAssistant) -> None:
     """Register the commands; they find the manager when they run."""
     websocket_api.async_register_command(hass, websocket_subscribe)
     websocket_api.async_register_command(hass, websocket_device_get)
+    websocket_api.async_register_command(hass, websocket_device_update)
+    websocket_api.async_register_command(hass, websocket_settings_get)
+    websocket_api.async_register_command(hass, websocket_settings_update)
+    websocket_api.async_register_command(hass, websocket_class_update)
 
 
 def _loaded_manager(hass: HomeAssistant) -> BatteryCareManager | None:
@@ -129,7 +146,7 @@ def websocket_subscribe(
 @websocket_api.websocket_command(
     {
         vol.Required("type"): "battery_care/device/get",
-        vol.Required("key"): vol.All(str, vol.Length(min=1, max=MAX_KEY_LENGTH)),
+        vol.Required("key"): KEY,
     }
 )
 @callback
@@ -148,3 +165,125 @@ def websocket_device_get(
         )
         return
     connection.send_result(msg["id"], device_details(hass, manager, msg["key"]))
+
+
+def _send_invalid(
+    connection: websocket_api.ActiveConnection, msg_id: int, err: SettingsError
+) -> None:
+    """Tell the panel which setting was refused and why, as stable codes."""
+    connection.send_error(msg_id, ERR_INVALID_SETTING, f"{err.key}: {err.code}")
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "battery_care/device/update",
+        vol.Required("key"): KEY,
+        vol.Required("mode"): vol.In([mode.value for mode in DeviceMode]),
+        vol.Optional("overrides", default=dict): _changes(OVERRIDABLE),
+        vol.Optional("importance"): vol.Any(
+            None, vol.In([level.value for level in Importance])
+        ),
+        vol.Optional("battery_class"): vol.Any(
+            None, vol.In([chosen.value for chosen in BatteryClass])
+        ),
+    }
+)
+@websocket_api.require_admin
+@callback
+def websocket_device_update(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Change what the user chose for a device, such as ignoring it."""
+    if (manager := _loaded_manager(hass)) is None:
+        _send_not_loaded(connection, msg["id"])
+        return
+    if msg["key"] not in manager.inventory.devices:
+        connection.send_error(
+            msg["id"], websocket_api.ERR_NOT_FOUND, "Unknown battery device"
+        )
+        return
+    try:
+        manager.async_configure_device(
+            msg["key"],
+            mode=DeviceMode(msg["mode"]),
+            overrides=msg["overrides"],
+            importance=Importance(msg["importance"]) if msg.get("importance") else None,
+            battery_class=BatteryClass(msg["battery_class"])
+            if msg.get("battery_class")
+            else None,
+        )
+    except SettingsError as err:
+        _send_invalid(connection, msg["id"], err)
+        return
+    connection.send_result(msg["id"], device_details(hass, manager, msg["key"]))
+
+
+@websocket_api.websocket_command(
+    vol.All(vol.Schema({vol.Required("type"): "battery_care/settings/get"}))
+)
+@callback
+def websocket_settings_get(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Return the settings; every user may read them."""
+    if (manager := _loaded_manager(hass)) is None:
+        _send_not_loaded(connection, msg["id"])
+        return
+    connection.send_result(msg["id"], settings_view(manager))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "battery_care/settings/update",
+        vol.Required("changes"): _changes(field.name for field in fields(Settings)),
+    }
+)
+@websocket_api.require_admin
+@callback
+def websocket_settings_update(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Change global settings, validated as a whole."""
+    if (manager := _loaded_manager(hass)) is None:
+        _send_not_loaded(connection, msg["id"])
+        return
+    try:
+        manager.async_update_settings(msg["changes"])
+    except SettingsError as err:
+        _send_invalid(connection, msg["id"], err)
+        return
+    connection.send_result(msg["id"], settings_view(manager))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "battery_care/class/update",
+        vol.Required("battery_class"): vol.In(
+            [chosen.value for chosen in BatteryClass]
+        ),
+        vol.Required("changes"): _changes(CLASS_KEYS),
+    }
+)
+@websocket_api.require_admin
+@callback
+def websocket_class_update(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Change the alerts and thresholds of a battery class."""
+    if (manager := _loaded_manager(hass)) is None:
+        _send_not_loaded(connection, msg["id"])
+        return
+    try:
+        manager.async_update_class(BatteryClass(msg["battery_class"]), msg["changes"])
+    except SettingsError as err:
+        _send_invalid(connection, msg["id"], err)
+        return
+    connection.send_result(msg["id"], settings_view(manager))
