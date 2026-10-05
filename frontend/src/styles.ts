@@ -31,6 +31,9 @@ export const sharedStyles = css`
   .tone-warning {
     color: var(--bc-warning);
   }
+  .tone-secondary {
+    color: var(--bc-secondary);
+  }
   .tone-muted {
     color: var(--bc-muted);
   }

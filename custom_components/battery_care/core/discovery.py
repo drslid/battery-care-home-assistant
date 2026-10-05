@@ -113,6 +113,10 @@ def _build(
     area_id = next((entity.area_id for entity, _ in ordered if entity.area_id), None)
     if area_id is None and device is not None:
         area_id = device.area_id
+    platforms = {entity.platform for entity, _ in ordered}
+    evidence = {entity.entity_id for entity, _ in ordered} | {
+        entity.entity_id for entity in siblings if entity.platform in platforms
+    }
     return BatteryDevice(
         key=key,
         name=_name(ordered, device),
@@ -129,6 +133,7 @@ def _build(
         manufacturer=device.manufacturer if device else None,
         model=device.model if device else None,
         metadata=metadata,
+        evidence=tuple(sorted(evidence)),
     )
 
 

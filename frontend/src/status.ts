@@ -15,6 +15,7 @@ import {
   mdiBatteryOutline,
   mdiBatteryUnknown,
   mdiBellOffOutline,
+  mdiClockAlertOutline,
   mdiLanDisconnect,
 } from "@mdi/js";
 import { html, type TemplateResult } from "lit";
@@ -38,6 +39,7 @@ const STATUS_ICONS: Record<Exclude<Status, "ok">, string> = {
   critical: mdiBatteryAlertVariantOutline,
   low: mdiBatteryLow,
   not_responding: mdiLanDisconnect,
+  stale: mdiClockAlertOutline,
   charging: mdiBatteryCharging,
   unknown: mdiBatteryUnknown,
   ignored: mdiBellOffOutline,
@@ -60,14 +62,17 @@ export function statusIcon(
     : STATUS_ICONS[device.status];
 }
 
-export type Tone = "error" | "warning" | "muted" | "default";
+export type Tone = "error" | "warning" | "secondary" | "muted" | "default";
 
-/** Colour is only for what needs attention; a device without data is muted. */
+/** Colour is only for what needs attention; doubtful data is greyed. */
 export function statusTone(
   device: Pick<DeviceView, "status" | "attention">,
 ): Tone {
   if (device.attention) {
     return device.status === "critical" ? "error" : "warning";
+  }
+  if (device.status === "stale") {
+    return "secondary";
   }
   return device.status === "unknown" ? "muted" : "default";
 }

@@ -13,7 +13,7 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.battery_care.adapters.tracking import REBUILD_COOLDOWN
 from custom_components.battery_care.const import DOMAIN, NAME
-from custom_components.battery_care.manager import BatteryCareManager
+from custom_components.battery_care.manager import STARTUP_WINDOW, BatteryCareManager
 
 BATTERY = {"device_class": "battery", "unit_of_measurement": "%"}
 
@@ -78,6 +78,18 @@ async def pass_rebuild_cooldown(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory
 ) -> None:
     """Let a debounced inventory rebuild run."""
-    freezer.tick(timedelta(seconds=REBUILD_COOLDOWN + 1))
+    await advance(hass, freezer, timedelta(seconds=REBUILD_COOLDOWN + 1))
+
+
+async def advance(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, delta: timedelta
+) -> None:
+    """Move the clock forward and run the timers that are due."""
+    freezer.tick(delta)
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
+
+
+async def finish_first_run(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    """Let the silent first run end with the startup window."""
+    await advance(hass, freezer, STARTUP_WINDOW + timedelta(seconds=1))

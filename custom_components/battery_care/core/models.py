@@ -96,6 +96,8 @@ class BatteryDevice:
     manufacturer: str | None = None
     model: str | None = None
     metadata: BatteryMetadata | None = None
+    # Entities whose reports prove the device is alive: same integration as sources.
+    evidence: tuple[str, ...] = ()
 
     @property
     def stable(self) -> bool:

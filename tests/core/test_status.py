@@ -1,11 +1,11 @@
-"""Device status from thresholds alone, and the summary counts."""
+"""Device status from the alert engine's conclusions, and the summary counts."""
 
 from dataclasses import replace
 
 import pytest
 
 from custom_components.battery_care.core.policy import DeviceMode
-from custom_components.battery_care.core.readings import Reading
+from custom_components.battery_care.core.runtime import Runtime, Severity
 from custom_components.battery_care.core.settings import DEFAULTS
 from custom_components.battery_care.core.status import (
     Status,
@@ -15,81 +15,41 @@ from custom_components.battery_care.core.status import (
     summarize,
 )
 
-
-def reading(
-    level: float | None = None,
-    *,
-    low: bool | None = None,
-    charging: bool = False,
-    available: bool = True,
-) -> Reading:
-    """Return a reading with only the values a test cares about."""
-    return Reading(level=level, low=low, charging=charging, available=available)
+SEEN = Runtime(last_level=50)
 
 
 @pytest.mark.parametrize(
-    ("level", "expected"),
+    ("runtime", "expected"),
     [
-        (100, Status.OK),
-        (21, Status.OK),
-        (20, Status.LOW),
-        (11, Status.LOW),
-        (10, Status.CRITICAL),
-        (0, Status.CRITICAL),
+        (replace(SEEN, severity=Severity.CRITICAL), Status.CRITICAL),
+        (replace(SEEN, severity=Severity.LOW), Status.LOW),
+        (SEEN, Status.OK),
+        (Runtime(last_low=False), Status.OK),
+        (replace(SEEN, stale=True), Status.STALE),
+        (Runtime(), Status.UNKNOWN),
     ],
 )
-def test_the_level_is_compared_with_the_thresholds(
-    level: float, expected: Status
-) -> None:
-    """At the threshold counts as below it, as in the brief (20 % is low)."""
-    assert device_status(reading(level), DEFAULTS, DeviceMode.AUTOMATIC) is expected
+def test_the_status_follows_the_engine(runtime: Runtime, expected: Status) -> None:
+    """Severity first, then staleness; a device never read is unknown."""
+    assert device_status(runtime, False, DeviceMode.AUTOMATIC) is expected
 
 
-def test_the_device_thresholds_apply() -> None:
-    """The effective settings of the device decide, not the global ones."""
-    custom = replace(DEFAULTS, low_threshold=30)
+def test_not_responding_and_charging_come_before_the_severity() -> None:
+    """A silent device has no current level, and a charging one is not low."""
+    critical = replace(SEEN, severity=Severity.CRITICAL)
 
-    assert device_status(reading(25), custom, DeviceMode.CUSTOM) is Status.LOW
-
-
-def test_a_low_flag_means_low_even_with_a_good_level() -> None:
-    """The device's own low flag is trusted."""
-    assert device_status(reading(80, low=True), DEFAULTS, DeviceMode.AUTOMATIC) is (
-        Status.LOW
+    assert device_status(critical, True, DeviceMode.AUTOMATIC) is Status.CHARGING
+    assert (
+        device_status(replace(critical, not_responding=True), True, DeviceMode.CUSTOM)
+        is Status.NOT_RESPONDING
     )
-    assert device_status(reading(low=True), DEFAULTS, DeviceMode.AUTOMATIC) is (
-        Status.LOW
-    )
-    assert device_status(reading(low=False), DEFAULTS, DeviceMode.AUTOMATIC) is (
-        Status.OK
-    )
-
-
-def test_a_critical_level_wins_over_a_clear_low_flag() -> None:
-    """The level is more precise than the flag."""
-    assert device_status(reading(5, low=False), DEFAULTS, DeviceMode.AUTOMATIC) is (
-        Status.CRITICAL
-    )
-
-
-def test_charging_and_unavailable_come_before_the_level() -> None:
-    """A charging device is not low, and an unavailable one has no level."""
-    assert device_status(reading(5, charging=True), DEFAULTS, DeviceMode.AUTOMATIC) is (
-        Status.CHARGING
-    )
-    assert device_status(
-        reading(available=False, charging=True), DEFAULTS, DeviceMode.AUTOMATIC
-    ) is (Status.NOT_RESPONDING)
-
-
-def test_no_value_yet_is_unknown() -> None:
-    """Sources that exist but report nothing usable."""
-    assert device_status(reading(), DEFAULTS, DeviceMode.AUTOMATIC) is Status.UNKNOWN
 
 
 def test_an_ignored_device_shows_as_ignored() -> None:
     """Ignoring a device hides its battery problems."""
-    assert device_status(reading(5), DEFAULTS, DeviceMode.IGNORED) is Status.IGNORED
+    critical = replace(SEEN, severity=Severity.CRITICAL, not_responding=True)
+
+    assert device_status(critical, False, DeviceMode.IGNORED) is Status.IGNORED
 
 
 def test_attention_needs_alerts_on() -> None:

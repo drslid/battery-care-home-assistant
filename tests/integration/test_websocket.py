@@ -354,7 +354,8 @@ async def test_device_details(
         {"type": "battery_care/device/get", "key": f"s:{yaml_id}"}
     )
     details = (await client.receive_json())["result"]
-    assert details["device"]["status"] == "not_responding"
+    # Unavailable from the start: no data yet, and still within the grace period.
+    assert details["device"]["status"] == "unknown"
     assert details["integration"] is None
     assert details["stable"] is False
     assert details["last_report"] is None

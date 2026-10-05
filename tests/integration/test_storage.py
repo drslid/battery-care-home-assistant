@@ -17,12 +17,14 @@ from pytest_homeassistant_custom_component.common import (
 from custom_components.battery_care.const import DOMAIN, NAME
 from custom_components.battery_care.core.models import Importance
 from custom_components.battery_care.core.policy import DeviceMode
+from custom_components.battery_care.core.runtime import Runtime, Severity
 from custom_components.battery_care.core.settings import SettingsError
 from custom_components.battery_care.manager import BatteryCareManager
 from custom_components.battery_care.storage import (
     CONFIG_KEY,
     STATE_KEY,
     ConfigData,
+    StateData,
     config_from_raw,
     state_from_raw,
 )
@@ -174,8 +176,22 @@ async def test_malformed_files_fall_back_to_defaults() -> None:
     )
     assert list(data.devices) == ["d:hall"]
     assert problems == []
-    assert state_from_raw(None) == ({}, [])
-    assert state_from_raw("known") == ({}, ["*"])
+    assert state_from_raw(None) == (StateData(), [])
+    assert state_from_raw("known") == (StateData(), ["*"])
+    assert state_from_raw({"devices": ["d:door"]}) == (StateData(), ["devices.*"])
+    state, problems = state_from_raw(
+        {
+            "devices": {
+                "d:door": {"severity": "low", "last_level": 17, "stale": "no"},
+                "d:hall": "low",
+            },
+            "baseline_done": "yes",
+        }
+    )
+    assert state == StateData(
+        devices={"d:door": Runtime(severity=Severity.LOW, last_level=17.0)}
+    )
+    assert problems == ["devices.d:door.stale", "devices.d:hall", "baseline_done"]
 
 
 async def test_data_from_a_newer_minor_version_is_read(

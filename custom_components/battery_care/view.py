@@ -11,8 +11,7 @@ from homeassistant.loader import IntegrationNotLoaded, async_get_loaded_integrat
 
 from .core.models import BatterySource, Importance
 from .core.policy import battery_class, importance
-from .core.settings import Settings
-from .core.status import Status, device_status, needs_attention, summarize
+from .core.status import needs_attention
 from .manager import BatteryCareManager
 
 API_VERSION = 1
@@ -22,29 +21,24 @@ def _area_names(hass: HomeAssistant) -> dict[str, str]:
     return {area.id: area.name for area in ar.async_get(hass).async_list_areas()}
 
 
-def _status(manager: BatteryCareManager, key: str) -> tuple[Status, Settings]:
-    settings = manager.effective_settings(key)
-    mode = manager.device_config(key).mode
-    return device_status(manager.readings[key], settings, mode), settings
-
-
 def _device(
-    manager: BatteryCareManager,
-    key: str,
-    status: Status,
-    settings: Settings,
-    areas: dict[str, str],
+    manager: BatteryCareManager, key: str, areas: dict[str, str]
 ) -> dict[str, Any]:
     device = manager.inventory.devices[key]
     config = manager.device_config(key)
+    status = manager.status(key)
     metadata = device.metadata
+    level = manager.readings[key].level
+    if level is None and (runtime := manager.state.devices.get(key)) is not None:
+        # The last known level, for a device that is silent right now.
+        level = runtime.last_level
     return {
         "key": key,
         "name": device.name,
         "area": areas.get(device.area_id) if device.area_id else None,
-        "level": manager.readings[key].level,
+        "level": level,
         "status": status.value,
-        "attention": needs_attention(status, settings),
+        "attention": needs_attention(status, manager.effective_settings(key)),
         "battery": None
         if metadata is None
         else {"type": metadata.battery_type, "quantity": metadata.quantity},
@@ -59,18 +53,12 @@ def _message(
     message_type: str,
     keys: Iterable[str],
 ) -> dict[str, Any]:
-    statuses = {key: _status(manager, key) for key in manager.inventory.devices}
     areas = _area_names(hass)
     return {
         "api": API_VERSION,
         "type": message_type,
-        "summary": asdict(
-            summarize(
-                (status, settings.alerts_enabled)
-                for status, settings in statuses.values()
-            )
-        ),
-        "devices": [_device(manager, key, *statuses[key], areas) for key in keys],
+        "summary": asdict(manager.summary),
+        "devices": [_device(manager, key, areas) for key in keys],
     }
 
 
@@ -103,7 +91,7 @@ def device_details(
     """Return everything the device sheet shows."""
     device = manager.inventory.devices[key]
     config = manager.device_config(key)
-    status, settings = _status(manager, key)
+    settings = manager.effective_settings(key)
     states = {
         source.entity_id: hass.states.get(source.entity_id) for source in device.sources
     }
@@ -120,7 +108,7 @@ def device_details(
         importance_source = "default"
     return {
         "api": API_VERSION,
-        "device": _device(manager, key, status, settings, _area_names(hass)),
+        "device": _device(manager, key, _area_names(hass)),
         "integration": _integration_name(hass, device.integration),
         "manufacturer": device.manufacturer,
         "model": device.model,

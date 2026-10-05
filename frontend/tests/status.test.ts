@@ -7,6 +7,7 @@ import {
   mdiBatteryOutline,
   mdiBatteryUnknown,
   mdiBellOffOutline,
+  mdiClockAlertOutline,
   mdiLanDisconnect,
 } from "@mdi/js";
 import { describe, expect, it } from "vitest";
@@ -26,6 +27,7 @@ describe("status display", () => {
     expect(icon("critical")).toBe(mdiBatteryAlertVariantOutline);
     expect(icon("low")).toBe(mdiBatteryLow);
     expect(icon("not_responding")).toBe(mdiLanDisconnect);
+    expect(icon("stale")).toBe(mdiClockAlertOutline);
     expect(icon("charging")).toBe(mdiBatteryCharging);
     expect(icon("unknown")).toBe(mdiBatteryUnknown);
     expect(icon("ignored")).toBe(mdiBellOffOutline);
@@ -43,5 +45,6 @@ describe("status display", () => {
       "default",
     );
     expect(statusTone({ status: "unknown", attention: false })).toBe("muted");
+    expect(statusTone({ status: "stale", attention: false })).toBe("secondary");
   });
 });

@@ -1,16 +1,29 @@
 """Structural rules and performance of the core."""
 
 import ast
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+import statistics
 import time
 
 from custom_components.battery_care.core.discovery import discover
-from custom_components.battery_care.core.models import DeviceRecord, EntityRecord
+from custom_components.battery_care.core.engine import (
+    Observation,
+    evaluate,
+    make_policy,
+)
+from custom_components.battery_care.core.models import (
+    DeviceRecord,
+    EntityRecord,
+    Importance,
+)
+from custom_components.battery_care.core.settings import DEFAULTS
 
 CORE = (
     Path(__file__).resolve().parents[2] / "custom_components" / "battery_care" / "core"
 )
 DISCOVERY_BUDGET = 0.25
+EVALUATION_BUDGET = 0.001
 
 
 def test_core_does_not_import_home_assistant() -> None:
@@ -58,3 +71,20 @@ def test_discovery_of_a_large_home_fits_the_budget() -> None:
 
     assert len(inventory.devices) == 1000
     assert elapsed < DISCOVERY_BUDGET
+
+
+def test_an_evaluation_fits_the_budget() -> None:
+    """The median evaluation of a state change takes under 1 ms."""
+    policy = make_policy(DEFAULTS, Importance.NORMAL)
+    now = datetime(2026, 1, 15, tzinfo=UTC)
+    runtime = evaluate(None, Observation(50, None, False, True), policy, now).runtime
+    timings: list[float] = []
+    for step in range(1000):
+        observation = Observation(50 - step % 50, step % 3 == 0, False, step % 7 > 0)
+        started = time.perf_counter()
+        runtime = evaluate(
+            runtime, observation, policy, now + timedelta(minutes=step)
+        ).runtime
+        timings.append(time.perf_counter() - started)
+
+    assert statistics.median(timings) < EVALUATION_BUDGET

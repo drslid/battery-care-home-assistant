@@ -48,6 +48,7 @@
     "critical": "Batterie critique",
     "low": "Batterie faible",
     "not_responding": "Ne répond pas",
+    "stale": "Données peut-être anciennes",
     "charging": "En charge",
     "ok": "OK",
     "unknown": "Pas encore de données",

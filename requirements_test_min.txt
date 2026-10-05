@@ -2,3 +2,5 @@
 pytest-homeassistant-custom-component==0.13.354
 # The panel depends on the frontend integration; this is the version 2026.8.0 pins.
 home-assistant-frontend==20260729.5
+# Property-based tests of the alert engine.
+hypothesis==6.168.4

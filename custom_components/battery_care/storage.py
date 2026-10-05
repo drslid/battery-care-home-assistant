@@ -10,6 +10,7 @@ from homeassistant.helpers.storage import Store
 from .const import DOMAIN
 from .core.known import KnownDevice, known_from_storage, known_to_storage
 from .core.policy import DeviceConfig, config_from_storage, config_to_storage
+from .core.runtime import Runtime, runtime_from_storage, runtime_to_storage
 from .core.settings import (
     DEFAULTS,
     Settings,
@@ -18,9 +19,11 @@ from .core.settings import (
 )
 
 STORAGE_VERSION = 1
-STORAGE_MINOR_VERSION = 1
 CONFIG_KEY = f"{DOMAIN}.config"
+CONFIG_MINOR_VERSION = 1
 STATE_KEY = f"{DOMAIN}.state"
+# 1.2 adds the runtime state of each device and the first-run flag.
+STATE_MINOR_VERSION = 2
 CONFIG_SAVE_DELAY = 1
 STATE_SAVE_DELAY = 15
 
@@ -41,6 +44,16 @@ class ConfigData:
 
     settings: Settings = DEFAULTS
     devices: dict[str, DeviceConfig] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class StateData:
+    """Everything Battery Care observed: devices it knows and what it concluded."""
+
+    known: dict[str, KnownDevice] = field(default_factory=dict)
+    devices: dict[str, Runtime] = field(default_factory=dict)
+    # The first run takes every state silently, then sends one summary.
+    baseline_done: bool = False
 
 
 def config_from_raw(raw: object) -> tuple[ConfigData, list[str]]:
@@ -78,24 +91,50 @@ def config_to_raw(data: ConfigData) -> dict[str, Any]:
     }
 
 
-def state_from_raw(raw: object) -> tuple[dict[str, KnownDevice], list[str]]:
+def state_from_raw(raw: object) -> tuple[StateData, list[str]]:
     """Rebuild the runtime state from storage, ignoring invalid values."""
     if raw is None:
-        return {}, []
+        return StateData(), []
     if not isinstance(raw, Mapping):
-        return {}, ["*"]
-    known, problems = known_from_storage(raw.get("known"))
-    return known, [f"known.{name}" for name in problems]
+        return StateData(), ["*"]
+    known, known_problems = known_from_storage(raw.get("known"))
+    problems = [f"known.{name}" for name in known_problems]
+    stored = raw.get("devices") or {}
+    if not isinstance(stored, Mapping):
+        problems.append("devices.*")
+        stored = {}
+    devices: dict[str, Runtime] = {}
+    for key, value in stored.items():
+        if not isinstance(value, Mapping):
+            problems.append(f"devices.{key}")
+            continue
+        runtime, device_problems = runtime_from_storage(value)
+        problems.extend(f"devices.{key}.{name}" for name in device_problems)
+        devices[str(key)] = runtime
+    baseline_done = raw.get("baseline_done", False)
+    if not isinstance(baseline_done, bool):
+        problems.append("baseline_done")
+        baseline_done = False
+    return StateData(known, devices, baseline_done), problems
 
 
-def state_to_raw(known: Mapping[str, KnownDevice]) -> dict[str, Any]:
+def state_to_raw(state: StateData) -> dict[str, Any]:
     """Return the storage form of the runtime state."""
-    return {"known": known_to_storage(known)}
+    return {
+        "known": known_to_storage(state.known),
+        "devices": {
+            key: runtime_to_storage(runtime) for key, runtime in state.devices.items()
+        },
+        "baseline_done": state.baseline_done,
+    }
 
 
 async def async_remove_stores(hass: HomeAssistant) -> None:
     """Delete everything Battery Care stored."""
-    for key in (CONFIG_KEY, STATE_KEY):
+    for key, minor_version in (
+        (CONFIG_KEY, CONFIG_MINOR_VERSION),
+        (STATE_KEY, STATE_MINOR_VERSION),
+    ):
         await BatteryCareStore(
-            hass, STORAGE_VERSION, key, minor_version=STORAGE_MINOR_VERSION
+            hass, STORAGE_VERSION, key, minor_version=minor_version
         ).async_remove()

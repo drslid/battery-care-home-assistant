@@ -2,6 +2,7 @@
 
 from functools import partial
 
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError, UnsupportedStorageVersionError
 from homeassistant.helpers import config_validation as cv
@@ -13,6 +14,7 @@ from .manager import BatteryCareConfigEntry, BatteryCareManager
 from .storage import async_remove_stores
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+PLATFORMS = [Platform.BINARY_SENSOR, Platform.SENSOR]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -41,6 +43,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BatteryCareConfigEntry) 
         ) from err
     entry.async_on_unload(partial(panel.async_remove_panel, hass))
     entry.runtime_data = manager
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     manager.async_start()
     return True
 
@@ -49,6 +52,8 @@ async def async_unload_entry(
     hass: HomeAssistant, entry: BatteryCareConfigEntry
 ) -> bool:
     """Unload Battery Care, writing pending changes first."""
+    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        return False
     await entry.runtime_data.async_unload()
     return True
 

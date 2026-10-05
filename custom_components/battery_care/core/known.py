@@ -2,8 +2,10 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
+
+from .timestamps import format_time, parse_time
 
 ORPHAN_RETENTION = timedelta(days=30)
 
@@ -54,27 +56,13 @@ def known_from_storage(raw: object) -> tuple[dict[str, KnownDevice], list[str]]:
         if not isinstance(key, str) or not isinstance(name, str):
             problems.append(str(key))
             continue
-        known[key] = KnownDevice(name, _parse_time(entry.get("orphaned_at")))
+        known[key] = KnownDevice(name, parse_time(entry.get("orphaned_at")))
     return known, problems
 
 
 def known_to_storage(known: Mapping[str, KnownDevice]) -> dict[str, Any]:
     """Return the storage form of the index."""
     return {
-        key: {
-            "name": entry.name,
-            "orphaned_at": entry.orphaned_at.isoformat() if entry.orphaned_at else None,
-        }
+        key: {"name": entry.name, "orphaned_at": format_time(entry.orphaned_at)}
         for key, entry in known.items()
     }
-
-
-def _parse_time(value: object) -> datetime | None:
-    """Read an aware timestamp; anything else counts as unknown."""
-    if not isinstance(value, str):
-        return None
-    try:
-        parsed = datetime.fromisoformat(value)
-    except ValueError:
-        return None
-    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)

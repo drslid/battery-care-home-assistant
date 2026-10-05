@@ -13,6 +13,30 @@
       "devices_found": "Appareils sur batterie trouvés : {count}. Battery Care continue de surveiller l’arrivée de nouveaux appareils.\n\n[Ouvrir Battery Care]({panel_url})"
     }
   },
+  "entity": {
+    "binary_sensor": {
+      "attention_required": {
+        "name": "Intervention requise"
+      }
+    },
+    "sensor": {
+      "health": {
+        "name": "Santé des batteries"
+      },
+      "attention": {
+        "name": "Batteries à traiter"
+      },
+      "low": {
+        "name": "Batteries faibles"
+      },
+      "critical": {
+        "name": "Batteries critiques"
+      },
+      "monitored": {
+        "name": "Batteries surveillées"
+      }
+    }
+  },
   "exceptions": {
     "panel_taken": {
       "message": "Un autre tableau de bord ou panneau utilise déjà {path}. Changez son adresse, puis rechargez Battery Care."

@@ -279,3 +279,24 @@ def test_results_are_sorted() -> None:
 
     assert list(first.devices) == ["d:door", "e:id-sensor.a", "e:id-sensor.b"]
     assert first == second
+
+
+def test_signs_of_life_come_from_the_integration_of_the_device() -> None:
+    """Entities that other integrations attach report nothing about the device."""
+    records = [
+        level("sensor.door_battery"),
+        level("sensor.door_signal", device_class="signal_strength", unit="dBm"),
+        level("sensor.door_quiet", device_class=None, disabled=True),
+        level("sensor.door_battery_type", platform="battery_notes", device_class=None),
+        level("sensor.garden_battery", platform="template", device_id=None),
+    ]
+
+    inventory = discover(records, DEVICES)
+
+    assert inventory.devices["d:door"].evidence == (
+        "sensor.door_battery",
+        "sensor.door_signal",
+    )
+    assert inventory.devices["e:id-sensor.garden_battery"].evidence == (
+        "sensor.garden_battery",
+    )

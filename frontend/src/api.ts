@@ -7,6 +7,7 @@ export type Status =
   | "critical"
   | "low"
   | "not_responding"
+  | "stale"
   | "charging"
   | "ok"
   | "unknown"

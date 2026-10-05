@@ -1,15 +1,11 @@
-"""What the panel shows for each battery device, and the counts it summarizes.
+"""What the panel shows for each battery device, and the counts it summarizes."""
 
-Until the alert engine exists, the status comes from the current reading and
-the thresholds alone: there is no grace period, delay or history yet.
-"""
-
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 
 from .policy import DeviceMode
-from .readings import Reading
+from .runtime import Runtime, Severity
 from .settings import Settings
 
 
@@ -19,6 +15,7 @@ class Status(StrEnum):
     CRITICAL = "critical"
     LOW = "low"
     NOT_RESPONDING = "not_responding"
+    STALE = "stale"
     CHARGING = "charging"
     OK = "ok"
     UNKNOWN = "unknown"
@@ -27,39 +24,21 @@ class Status(StrEnum):
 
 ATTENTION = frozenset({Status.CRITICAL, Status.LOW, Status.NOT_RESPONDING})
 
-type Rule = Callable[[Reading, Settings], bool]
 
-# The first matching rule wins; a device that matches none is OK.
-RULES: tuple[tuple[Rule, Status], ...] = (
-    (lambda reading, _settings: not reading.available, Status.NOT_RESPONDING),
-    (lambda reading, _settings: reading.charging, Status.CHARGING),
-    (
-        lambda reading, settings: (
-            reading.level is not None and reading.level <= settings.critical_threshold
-        ),
-        Status.CRITICAL,
-    ),
-    (
-        lambda reading, settings: (
-            bool(reading.low)
-            or (reading.level is not None and reading.level <= settings.low_threshold)
-        ),
-        Status.LOW,
-    ),
-    (
-        lambda reading, _settings: reading.level is None and reading.low is None,
-        Status.UNKNOWN,
-    ),
-)
-
-
-def device_status(reading: Reading, settings: Settings, mode: DeviceMode) -> Status:
-    """Return the status of a device from its reading and effective settings."""
+def device_status(runtime: Runtime, charging: bool, mode: DeviceMode) -> Status:
+    """Return the status of a device from what the alert engine concluded."""
     if mode is DeviceMode.IGNORED:
         return Status.IGNORED
-    return next(
-        (status for rule, status in RULES if rule(reading, settings)), Status.OK
+    # The first match wins; a device that matches none is OK.
+    checks = (
+        (runtime.not_responding, Status.NOT_RESPONDING),
+        (charging, Status.CHARGING),
+        (runtime.severity is Severity.CRITICAL, Status.CRITICAL),
+        (runtime.severity is Severity.LOW, Status.LOW),
+        (runtime.stale, Status.STALE),
+        (runtime.last_level is None and runtime.last_low is None, Status.UNKNOWN),
     )
+    return next((status for matches, status in checks if matches), Status.OK)
 
 
 def needs_attention(status: Status, settings: Settings) -> bool:

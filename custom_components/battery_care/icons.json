@@ -1,0 +1,29 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "attention_required": {
+        "default": "mdi:battery-check",
+        "state": {
+          "on": "mdi:battery-alert-variant-outline"
+        }
+      }
+    },
+    "sensor": {
+      "health": {
+        "default": "mdi:battery-heart-variant"
+      },
+      "attention": {
+        "default": "mdi:battery-alert-variant-outline"
+      },
+      "low": {
+        "default": "mdi:battery-low"
+      },
+      "critical": {
+        "default": "mdi:battery-alert-variant-outline"
+      },
+      "monitored": {
+        "default": "mdi:battery-check"
+      }
+    }
+  }
+}
