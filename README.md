@@ -10,6 +10,10 @@ Battery Care finds every **battery-powered device** in Home Assistant on its own
 [![Open your Home Assistant instance and open this repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=drslid&repository=battery-care-home-assistant&category=integration)
 [![Open your Home Assistant instance and start setting up Battery Care.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=battery_care)
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/drslid/battery-care-home-assistant/main/docs/assets/overview.webp" alt="Battery Care overview in Home Assistant: 4 batteries need attention, the front door lock is critical at 6% and the garage motion sensor is low at 17%" width="880">
+</p>
+
 ## ✨ What it does
 
 - 🔍 **Finds every battery** — battery levels, low-battery warnings and charging sensors, but also the `battery_level` attribute of older integrations, text states such as _low_ or _full_, and percentage sensors named like a battery. They are grouped per device, without duplicates: copies made by Battery Notes or by helpers such as groups and statistics are skipped.
@@ -21,6 +25,12 @@ Battery Care finds every **battery-powered device** in Home Assistant on its own
 - 📊 **Ready for your dashboards and automations** — a battery health score, the counts of low, critical and monitored batteries, an _Attention required_ sensor, and `battery_care_alert` and `battery_care_recovered` events.
 - 🏷️ **Works with [Battery Notes](https://github.com/andrew-codechimp/HA-Battery-Notes)** — when it is installed, the battery type and quantity come from it. It is not required.
 - 🌍 **English and French**, in light and dark mode.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/drslid/battery-care-home-assistant/main/docs/assets/battery-sheet.webp" alt="Detail sheet of the front door lock battery: 6%, battery critical, snooze buttons, battery type, importance and own thresholds" width="620">
+  <img src="https://raw.githubusercontent.com/drslid/battery-care-home-assistant/main/docs/assets/phone-fr.webp" alt="Battery Care overview on a phone, in French" width="179">
+  <br><sub>The detail sheet of a battery, and the overview on a phone in French.</sub>
+</p>
 
 ## 🗺️ Roadmap
 
